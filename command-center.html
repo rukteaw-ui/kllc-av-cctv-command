@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KLLC // Commander Workload &amp; Spiderweb Command Center</title>
+  <meta name="description" content="ศูนย์บัญชาการบริหารภาระงาน โครงสร้างเอกสาร และเครือข่ายใยแมงมุมเชื่อมโยงระบบ AV, CCTV, TOR และ 4 เสาหลักของบอสวิภาส" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+Thai:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <!-- Open Source Libraries: Cytoscape.js (Spiderweb Graph) + Fuse.js (Fuzzy Search) -->
+  <script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+  <script src="https://unpkg.com/fuse.js@7.0.0/dist/fuse.min.js"></script>
+  <style>
+    :root {
+      --bg: #07090d;
+      --bg-panel: rgba(13, 17, 25, 0.92);
+      --bg-card: rgba(19, 24, 35, 0.85);
+      --border: rgba(255, 255, 255, 0.09);
+      --border-hi: rgba(255, 255, 255, 0.22);
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --dim: #64748b;
+      --red: #ff2e2e;
+      --orange: #ff6a26;
+      --green: #22c55e;
+      --blue: #38bdf8;
+      --purple: #a855f7;
+      --amber: #f59e0b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg); color: var(--text);
+      font-family: 'Noto Sans Thai', 'Space Grotesk', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+    .ambient-bg {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(ellipse 75% 55% at 50% 42%, rgba(30, 41, 59, 0.45) 0%, rgba(7, 9, 13, 0.95) 68%, #05070a 100%),
+        radial-gradient(circle at 15% 75%, rgba(255, 46, 46, 0.07) 0%, transparent 45%),
+        radial-gradient(circle at 85% 25%, rgba(56, 189, 248, 0.07) 0%, transparent 45%);
+    }
+
+    /* Top Navigation */
+    .top-nav {
+      position: fixed; top: 0; left: 0; right: 0; height: 64px; padding: 0 20px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      background: rgba(7, 9, 13, 0.92); backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border); z-index: 40;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
+    .brand-title { font-size: 14px; font-weight: 700; color: #fff; white-space: nowrap; }
+    .brand-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .nav-tabs {
+      display: flex; align-items: center; gap: 4px;
+      background: rgba(255,255,255,0.04); padding: 4px; border-radius: 8px;
+      border: 1px solid var(--border); overflow-x: auto;
+    }
+    .nav-tab {
+      background: transparent; border: none; color: #cbd5e1;
+      font-family: inherit; font-size: 12.5px; font-weight: 600;
+      padding: 7px 13px; border-radius: 6px; cursor: pointer;
+      white-space: nowrap; transition: all 0.18s;
+    }
+    .nav-tab:hover { color: #fff; background: rgba(255,255,255,0.05); }
+    .nav-tab.active { background: var(--red); color: #fff; box-shadow: 0 2px 12px rgba(255, 46, 46, 0.35); }
+
+    .nav-actions { display: flex; align-items: center; gap: 8px; }
+    .btn-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 11px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      text-decoration: none; color: #e2e8f0;
+      background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+      cursor: pointer; transition: all 0.18s; white-space: nowrap;
+    }
+    .btn-link:hover { border-color: var(--orange); color: #fff; background: rgba(255,106,38,0.14); }
+    .btn-link.primary { background: rgba(56,189,248,0.14); border-color: rgba(56,189,248,0.35); color: #7dd3fc; }
+
+    /* Main Workspace */
+    .workspace {
+      position: fixed; top: 64px; left: 0; right: 0; bottom: 0; z-index: 10;
+      display: flex; overflow: hidden;
+    }
+    .view-pane {
+      flex: 1; height: 100%; overflow-y: auto; display: none; position: relative;
+    }
+    .view-pane.active { display: block; }
+    #view-graph.active { display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Graph View */
+    .graph-toolbar {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+      padding: 10px 18px; background: rgba(11, 14, 21, 0.85); border-bottom: 1px solid var(--border);
+      z-index: 15;
+    }
+    .filter-pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .fpill {
+      padding: 5px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+      background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+      color: var(--muted); cursor: pointer; transition: all 0.15s;
+    }
+    .fpill:hover { color: #fff; border-color: var(--border-hi); }
+    .fpill.active { color: #fff; background: rgba(255, 106, 38, 0.2); border-color: var(--orange); }
+    #cy { flex: 1; width: 100%; height: 100%; min-height: 400px; }
+
+    .graph-legend {
+      position: absolute; bottom: 14px; left: 16px; z-index: 14;
+      background: rgba(11, 14, 21, 0.88); backdrop-filter: blur(10px);
+      border: 1px solid var(--border); border-radius: 8px; padding: 8px 13px;
+      display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: var(--muted);
+    }
+    .leg-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+
+    /* Content Containers for Other Views */
+    .container { max-width: 1240px; margin: 0 auto; padding: 22px 24px 60px; }
+    .sec-hdr { margin-bottom: 18px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+    .sec-hdr h2 { font-size: 20px; font-weight: 700; color: #fff; }
+    .sec-hdr p { font-size: 13px; color: var(--muted); margin-top: 3px; }
+
+    /* KPI Grid */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .kpi-box {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px;
+    }
+    .kpi-box .lbl { font-size: 11.5px; color: var(--muted); }
+    .kpi-box .val { font-family: 'JetBrains Mono', 'Noto Sans Thai', monospace; font-size: 22px; font-weight: 700; margin-top: 4px; color: #fff; }
+    .kpi-box .sub { font-size: 11.5px; color: var(--dim); margin-top: 3px; }
+
+    /* Cards & Grids */
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px;
+    }
+    .card-title {
+      font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .badge {
+      font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 5px;
+      background: rgba(34,197,94,0.16); color: #4ade80; white-space: nowrap;
+    }
+    .badge.warn { background: rgba(255,46,46,0.18); color: #f87171; }
+    .badge.orange { background: rgba(255,106,38,0.18); color: #fb923c; }
+    .badge.blue { background: rgba(56,189,248,0.18); color: #7dd3fc; }
+    .badge.purple { background: rgba(168,85,247,0.18); color: #d8b4fe; }
+
+    /* Progress Bars */
+    .jd-row { margin-bottom: 12px; }
+    .jd-top { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px; gap: 8px; }
+    .jd-bar { height: 7px; background: rgba(255,255,255,0.07); border-radius: 4px; overflow: hidden; }
+    .jd-fill { height: 100%; border-radius: 4px; }
+
+    /* Checklist */
+    .chk-item {
+      display: flex; align-items: flex-start; gap: 10px; padding: 9px 11px;
+      background: rgba(255,255,255,0.025); border: 1px solid var(--border);
+      border-radius: 6px; margin-bottom: 7px; cursor: pointer; transition: background 0.15s;
+    }
+    .chk-item:hover { background: rgba(255,255,255,0.05); }
+    .chk-item input { margin-top: 3px; accent-color: var(--green); cursor: pointer; }
+    .chk-item.done .chk-text { text-decoration: line-through; color: var(--dim); }
+    .chk-text { font-size: 12.5px; line-height: 1.45; }
+    .chk-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* Search & Taxonomy */
+    .search-bar-wrap {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+    }
+    .search-input {
+      flex: 1; min-width: 240px; background: rgba(7,9,13,0.8); border: 1px solid var(--border);
+      border-radius: 6px; padding: 9px 13px; color: #fff; font-family: inherit; font-size: 13.5px;
+      outline: none;
+    }
+    .search-input:focus { border-color: var(--blue); }
+    .sel-filter {
+      background: rgba(7,9,13,0.8); border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 11px; color: #e2e8f0; font-family: inherit; font-size: 12.5px; outline: none;
+    }
+    .tax-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+    .tax-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 13px 15px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;
+      transition: border-color 0.15s, transform 0.15s; cursor: pointer;
+    }
+    .tax-card:hover { border-color: var(--orange); transform: translateY(-1px); }
+    .tax-cat { font-size: 10.5px; font-weight: 600; color: var(--orange); margin-bottom: 3px; }
+    .tax-title { font-size: 13.5px; font-weight: 700; color: #fff; line-height: 1.35; }
+    .tax-desc { font-size: 12px; color: var(--muted); line-height: 1.45; margin-top: 5px; }
+    .tax-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px; }
+
+    /* Right Inspector Drawer */
+    .inspector {
+      width: 390px; max-width: 100vw; height: 100%;
+      background: var(--bg-panel); backdrop-filter: blur(18px);
+      border-left: 1px solid var(--border);
+      display: none; flex-direction: column; z-index: 30;
+    }
+    .inspector.open { display: flex; }
+    .insp-hdr {
+      padding: 15px 18px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+    }
+    .insp-cat { font-size: 11px; font-weight: 600; color: var(--orange); margin-bottom: 3px; }
+    .insp-title { font-size: 15.5px; font-weight: 700; color: #fff; line-height: 1.35; }
+    .insp-close {
+      background: rgba(255,255,255,0.08); border: none; color: #cbd5e1;
+      width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 16px; flex-shrink: 0;
+    }
+    .insp-body { flex: 1; overflow-y: auto; padding: 16px 18px; }
+    .insp-box {
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      border-radius: 6px; padding: 11px 13px; font-size: 12.5px; color: #cbd5e1; line-height: 1.55; margin-bottom: 14px;
+    }
+    .insp-sec { font-size: 11.5px; font-weight: 700; color: var(--orange); margin: 14px 0 8px; }
+    .rel-chip {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 8px 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      border-radius: 6px; margin-bottom: 6px; cursor: pointer; font-size: 12px; color: #e2e8f0;
+    }
+    .rel-chip:hover { border-color: var(--blue); background: rgba(56,189,248,0.08); }
+
+    /* Table */
+    .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    th { background: rgba(255,255,255,0.04); color: var(--muted); font-weight: 600; font-size: 11.5px; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    @media (max-width: 900px) {
+      .brand-sub { display: none; }
+      .inspector { position: fixed; top: 64px; right: 0; bottom: 0; width: 100%; }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-bg"></div>
+
+  <header class="top-nav">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="16" r="12" stroke="#FF6A26" stroke-width="1.6" stroke-dasharray="3 2"/>
+        <circle cx="16" cy="16" r="4" fill="#FF2E2E"/>
+        <line x1="16" y1="4" x2="16" y2="12" stroke="#38BDF8" stroke-width="1.6"/>
+        <line x1="16" y1="20" x2="16" y2="28" stroke="#22C55E" stroke-width="1.6"/>
+        <line x1="4" y1="16" x2="12" y2="16" stroke="#F59E0B" stroke-width="1.6"/>
+        <line x1="20" y1="16" x2="28" y2="16" stroke="#A855F7" stroke-width="1.6"/>
+      </svg>
+      <div>
+        <div class="brand-title">KLLC // ศูนย์บัญชาการภาระงาน &amp; ใยแมงมุม</div>
+        <div class="brand-sub">บอสวิภาส อ่อนน้อม · เชื่อมโยงระบบ AV · CCTV · เอกสาร TOR · 4 เสาหลัก Drive</div>
+      </div>
+    </div>
+
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="graph">🕸️ เครือข่ายใยแมงมุม</button>
+      <button class="nav-tab" data-tab="workload">📊 วิเคราะห์ภาระงาน (JD)</button>
+      <button class="nav-tab" data-tab="taxonomy">🗂️ สารบัญไฟล์ &amp; ค้นหา</button>
+      <button class="nav-tab" data-tab="ai">🤖 ระบบ AI &amp; Live Sync</button>
+    </nav>
+
+    <div class="nav-actions">
+      <a class="btn-link primary" href="./index.html" title="เปิดแผนผัง 3 มิติ AV &amp; CCTV">🎯 แผนผัง 3 มิติ</a>
+      <a class="btn-link" href="https://drive.google.com/drive/folders/1uVURzgEy9wDgS16fVBa6OI-42SyXkCLn" target="_blank" rel="noopener">📁 Drive KLLC</a>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <!-- TAB 1: SPIDERWEB GRAPH -->
+    <section class="view-pane active" id="view-graph">
+      <div class="graph-toolbar">
+        <div class="filter-pills" id="graph-filters">
+          <button class="fpill active" data-group="all">ทั้งหมด (ใยแมงมุมรวม)</button>
+          <button class="fpill" data-group="av">🔊 เสา 1: โสตฯ &amp; พื้นที่ (AV 87%)</button>
+          <button class="fpill" data-group="cctv">📹 เสา 2: กล้อง CCTV &amp; ความปลอดภัย (6%)</button>
+          <button class="fpill" data-group="docs">📑 เอกสาร TOR / ครุภัณฑ์ / SLA</button>
+          <button class="fpill" data-group="pillars">🏛️ 4 เสาหลัก &amp; AI Hub</button>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <select class="sel-filter" id="layout-select" style="padding:5px 9px; font-size:11.5px;">
+            <option value="cose">เลย์เอาต์: ใยแมงมุม (Force)</option>
+            <option value="concentric">เลย์เอาต์: วงแหวนศูนย์กลาง</option>
+            <option value="breadthfirst">เลย์เอาต์: ลำดับชั้น (Tree)</option>
+          </select>
+          <button class="btn-link" id="btn-fit" style="padding:5px 10px; font-size:11.5px;">รีเซ็ตซูม</button>
+        </div>
+      </div>
+      <div id="cy"></div>
+      <div class="graph-legend">
+        <span><span class="leg-dot" style="background:#ff2e2e"></span>ศูนย์กลาง / Command</span>
+        <span><span class="leg-dot" style="background:#22c55e"></span>งาน AV &amp; พื้นที่ (87%)</span>
+        <span><span class="leg-dot" style="background:#ff6a26"></span>งาน CCTV &amp; ความเสี่ยง (6%)</span>
+        <span><span class="leg-dot" style="background:#38bdf8"></span>เอกสาร TOR / Sheets / SOP</span>
+        <span><span class="leg-dot" style="background:#a855f7"></span>AI Hub &amp; 4 เสาหลัก</span>
+        <span style="color:#64748b">| คลิกที่โหนดเพื่อดูสายเชื่อมโยง + เปิดไฟล์ Drive ทันที</span>
+      </div>
+    </section>
+
+    <!-- TAB 2: WORKLOAD & JD ANALYSIS -->
+    <section class="view-pane" id="view-workload">
+      <div class="container">
+        <div class="sec-hdr">
+          <div>
+            <h2>วิเคราะห์โครงสร้างภาระงานจริงของบอส (Job 68 + 4 เสาหลัก)</h2>
+            <p>อ้างอิงจากเอกสารส่งมอบงาน KLLC (27 ต.ค. 69), แผน SLA 7 ขั้นตอน, และบันทึกความเสี่ยง CCTV/ครุภัณฑ์ 2569</p>
+          </div>
+          <a class="btn-link" href="https://docs.google.com/document/d/15WMmNqTd4_a3Wr_L3YbTgGDzBKZ1hZxFeqPhqHiC6x4/edit" target="_blank" rel="noopener">📄 เปิดเอกสาร Handover ฉบับเต็ม</a>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi-box">
+            <div class="lbl">เสาหลัก 1: โสตฯ (AV) &amp; พื้นที่ A-B</div>
+            <div class="val" style="color:var(--green)">87%</div>
+            <div class="sub">AV 47% + พื้นที่บริการ 40% (~250 ครั้ง/ปี)</div>
+          </div>
+          <div class="kpi-box">
+            <div class="lbl">เสาหลัก 2: ระบบกล้อง CCTV</div>
+            <div class="val" style="color:var(--orange)">6% <span style="font-size:13px; color:#f87171">(High Risk)</span></div>
+            <div class="sub">อาคาร A 45 จุด + อาคาร B 7 จุด + PDPA</div>
+          </div>
+          <div class="kpi-box">
+            <div class="lbl">ระบบอัตโนมัติ &amp; งานมอบหมาย</div>
+            <div class="val" style="color:var(--blue)">7%</div>
+            <div class="sub">AppSheet 2% + Hackathon/ฝึกงาน 5%</div>
+          </div>
+          <div class="kpi-box">
+            <div class="lbl">งบประมาณ &amp; ครุภัณฑ์ในมือ</div>
+            <div class="val">487 <span style="font-size:13px; color:var(--muted)">รายการ</span></div>
+            <div class="sub">ตรวจครบ 100% · งบลงทุนปี 70: ฿7.64M</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">
+              <span>⚖️ สัดส่วนภาระงานตาม Job Description (รวม 100%)</span>
+              <span class="badge blue">Job 68</span>
+            </div>
+            <div id="jd-breakdown"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">
+              <span>⚡ จุดคอขวด &amp; ความเสี่ยงที่ต้องโฟกัส (Action Alerts)</span>
+              <span class="badge warn">ต้องติดตาม</span>
+            </div>
+            <div id="risk-list"></div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">
+              <span>🔄 เช็กลิสต์งานประจำรอบเวลา (บันทึกติ๊กถูกอัตโนมัติ)</span>
+              <button class="btn-link" id="btn-reset-chk" style="padding:3px 9px; font-size:11px;">ล้างเครื่องหมาย</button>
+            </div>
+            <div id="routine-checklist"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">
+              <span>⏱️ มาตรฐาน SLA 7 ขั้นตอน (บริการโสตฯ &amp; ห้อง)</span>
+              <span class="badge">SOP</span>
+            </div>
+            <div id="sla-flow"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: TAXONOMY & SEARCH -->
+    <section class="view-pane" id="view-taxonomy">
+      <div class="container">
+        <div class="sec-hdr">
+          <div>
+            <h2>สารบัญไฟล์ หมวดหมู่ &amp; หมวดหมู่ย่อย (ค้นหาแบบ Fuzzy Search)</h2>
+            <p>รวมไฟล์จริงจาก 3 เสาหลัก Drive โดยตัดไฟล์วิดีโอขนาดใหญ่ออก — กด <kbd style="background:#1e293b;padding:2px 6px;border-radius:4px;">/</kbd> เพื่อค้นหาทันที</p>
+          </div>
+          <span class="badge blue" id="tax-count">0 รายการ</span>
+        </div>
+
+        <div class="search-bar-wrap">
+          <input type="text" id="search-input" class="search-input" placeholder="ค้นหาชื่อไฟล์, งาน, อาคาร, TOR, SOP, Sheet, เช่น 'CCTV', 'PreSonus', 'งบ 70', 'PDPA'..." />
+          <select id="cat-filter" class="sel-filter">
+            <option value="all">ทุกหมวดหลัก (Category)</option>
+          </select>
+          <select id="subcat-filter" class="sel-filter">
+            <option value="all">ทุกหมวดย่อย (Subcategory)</option>
+          </select>
+          <select id="sort-filter" class="sel-filter">
+            <option value="pillar">เรียงตามหมวดหมู่</option>
+            <option value="priority">เรียงตามความสำคัญ/ความเสี่ยง</option>
+            <option value="name">เรียงตามชื่อ ก-ฮ / A-Z</option>
+          </select>
+        </div>
+
+        <div class="tax-grid" id="tax-grid"></div>
+      </div>
+    </section>
+
+    <!-- TAB 4: AI GOVERNANCE & LIVE SYNC -->
+    <section class="view-pane" id="view-ai">
+      <div class="container">
+        <div class="sec-hdr">
+          <div>
+            <h2>โครงสร้างป้องกัน AI ทำงานซ้ำซ้อน &amp; Live Google Sheets Sync</h2>
+            <p>กำหนดขอบเขตหน้าที่ชัดเจนของ Agent, ท่อส่งไฟล์ `inbox → ถังรวม → ปลายทาง` และการซิงก์ข้อมูลสดแบบไม่ต้องใช้ Backend</p>
+          </div>
+          <button class="btn-link primary" id="btn-export-json">⬇️ Export สารบัญโครงสร้าง (JSON)</button>
+        </div>
+
+        <div class="card" style="margin-bottom:18px;">
+          <div class="card-title">
+            <span>🛡️ กฎแบ่งเขต AI Agents (Zero-Duplication Governance)</span>
+            <span class="badge">SSOT Active</span>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>บทบาท / ระบบ</th>
+                  <th>พื้นที่รับผิดชอบใน Drive</th>
+                  <th>ห้ามทำ (Boundary)</th>
+                  <th>จุดอ้างอิง SSOT</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>1. งานสถาบัน KLLC (AV + CCTV + ครุภัณฑ์)</strong></td>
+                  <td><code>1. งาน KLLC (ที่ทำงาน)</code></td>
+                  <td>ห้ามวางโค้ดทดลอง, คลิปส่วนตัว, หรือไฟล์ร่าง AI</td>
+                  <td><a class="btn-link" href="https://drive.google.com/file/d/1oNvd8V7A8fRopamlqXvIhld4jI6bN0yb/view" target="_blank">CCTV_MASTER_DATABASE_SSOT.md</a></td>
+                </tr>
+                <tr>
+                  <td><strong>2. ส่วนตัว &amp; ธุรกิจ (DODODIX / ปันผล)</strong></td>
+                  <td><code>2. ส่วนตัวและร้านค้า</code> (Shortcuts)</td>
+                  <td>ห้ามนำสคริปต์/ระบบหลังบ้านมาปะปน</td>
+                  <td><a class="btn-link" href="https://drive.google.com/drive/folders/1JgfPAHhEx7Wy2AlkZwlNpZygYFVadQ8Y" target="_blank">เปิดโฟลเดอร์เสา 2</a></td>
+                </tr>
+                <tr>
+                  <td><strong>3. AI Hub &amp; Automation Pipeline</strong></td>
+                  <td><code>9. คลังเก็บของเก่าและระบบหลังบ้าน</code></td>
+                  <td>ห้ามสร้างโฟลเดอร์หลุดออกไปที่หน้าแรก My Drive</td>
+                  <td><a class="btn-link" href="https://drive.google.com/drive/folders/1QVyBFNDfliYs_7VxLdZ5RRmftttDu8OJ" target="_blank">00_CENTRAL_AGENT_HUB</a></td>
+                </tr>
+                <tr>
+                  <td><strong>4. ท่อรับไฟล์ทางเดียว (Dropzone)</strong></td>
+                  <td><code>inbox</code> → <code>ถังรวม ห้ามลบ</code> → ปลายทาง</td>
+                  <td>ห้าม Agents ย้ายไฟล์ตรงโดยไม่ผ่าน Log</td>
+                  <td><a class="btn-link" href="https://drive.google.com/drive/folders/1gAjmyJRPaq9mymqtAdvUBu8jNLuHyW_N" target="_blank">เปิด inbox</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>🔄 ดึงข้อมูลสดจาก Google Sheets (Client-Side GViz JSON Sync)</span>
+            <span class="badge blue" id="sync-status">พร้อมซิงก์ (ไม่ต้องใช้ API Key)</span>
+          </div>
+          <p style="font-size:12.5px; color:var(--muted); margin-bottom:12px;">
+            ใช้เทคโนโลยี Google Visualization Endpoint (<code>gviz/tq?tqx=out:json</code>) ดึงข้อมูลล่าสุดจาก Google Sheets ที่แชร์สิทธิ์ Viewer ได้โดยตรงจาก Browser (หาก Sheet ยังเป็น Private ระบบจะแสดงลิงก์เปิดตรงและใช้ข้อมูลแคช SSOT แทน)
+          </p>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
+            <button class="btn-link primary" onclick="syncSheet('1rxnx_U1aoH0IYcOJNG8kQaAEtYNj2XDhuc7Le6fuxNM', 'KLLC AV CCTV Master')">🔄 ทดสอบดึง KLLC AV CCTV</button>
+            <button class="btn-link primary" onclick="syncSheet('1rl8BN1Isw1Zb17uukpl2wr0dKP-NiAewO68CYeUyHUM', 'KLLC สำรวจครุภัณฑ์ 69')">🔄 ทดสอบดึง ครุภัณฑ์ 69</button>
+            <button class="btn-link" onclick="syncSheet('1TNBCW9oQ-JV9fACbm9su7p7gIwzPmqEf6fiGMIwZY8c', 'Daily Inspection Log')">🔄 ทดสอบดึง Daily Log</button>
+          </div>
+          <div id="sync-preview" class="insp-box" style="margin-bottom:0; max-height:260px; overflow:auto; font-family:'JetBrains Mono', monospace; font-size:11.5px;">
+            กดปุ่มด้านบนเพื่อทดสอบดึงข้อมูลสดจาก Google Sheets...
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT INSPECTOR DRAWER -->
+    <aside class="inspector" id="inspector">
+      <div class="insp-hdr">
+        <div>
+          <div class="insp-cat" id="insp-cat">--</div>
+          <div class="insp-title" id="insp-title">--</div>
+        </div>
+        <button class="insp-close" id="insp-close" title="ปิด">×</button>
+      </div>
+      <div class="insp-body" id="insp-body"></div>
+    </aside>
+  </main>
+
+  <script>
+  // =========================================================================
+  // 1. MASTER KNOWLEDGE GRAPH & TAXONOMY DATA (Grounded from Boss's Drive)
+  // =========================================================================
+  const ITEMS = [
+    // --- HUB ---
+    {
+      id: 'hub-boss',
+      name: 'บอสวิภาส · ศูนย์บัญชาการ 4 เสา',
+      category: '0. ศูนย์บัญชาการกลาง (Command Hub)',
+      subcategory: 'Commander Profile & Boundaries',
+      group: 'pillars',
+      color: '#ff2e2e',
+      size: 46,
+      priority: 1,
+      type: 'Command Hub',
+      status: 'Active SSOT',
+      statusCls: 'warn',
+      url: 'https://drive.google.com/drive/folders/1-UwWkyDzql8mEyF3xtdfX_uidamquF8o',
+      desc: 'ศูนย์กลางภาระงานของนายวิภาส อ่อนน้อม (KLLC สจล.) เชื่อมงานประจำ 2 เสาหลัก (AV 87% + CCTV 6% + อื่นๆ 7%) เข้ากับระบบ AI และธุรกิจส่วนตัว 4 เสา',
+      links: ['pillar-av', 'pillar-cctv', 'pillar-docs', 'pillar-ai', 'ext-dododix', 'ext-bmt', 'ext-dividend']
+    },
+
+    // --- PILLAR 1: AV & LEARNING SPACE (87%) ---
+    {
+      id: 'pillar-av',
+      name: 'เสา 1: โสตทัศนูปกรณ์ & พื้นที่ (AV 87%)',
+      category: '1. งาน KLLC · ระบบโสตฯ (AV)',
+      subcategory: 'ภาพรวมพันธกิจหลัก (47% + 40%)',
+      group: 'av',
+      color: '#22c55e',
+      size: 40,
+      priority: 1,
+      type: 'Folder / Pillar',
+      status: 'พร้อมใช้ 100%',
+      statusCls: '',
+      url: 'https://drive.google.com/drive/folders/17uOhugEf4epuxGO6KRX2dYEFzJc6XWIb',
+      desc: 'ภาระงานหลัก 87% ของ JD (ดูแลโสตฯ 47% + พื้นที่อาคาร A-B 40%, ~250 ครั้ง/ปี) ครอบคลุมตู้แร็คเสียง ห้องสัมมนา และงานกิจกรรมสถาบัน',
+      links: ['av-sla', 'av-sop-master', 'av-tor-2570', 'av-tor-2571', 'av-tor-p6', 'kllc-3d']
+    },
+    {
+      id: 'av-sla',
+      name: 'คู่มือ OKR-SLA บริการโสตฯ (7 ขั้นตอน)',
+      category: '1. งาน KLLC · ระบบโสตฯ (AV)',
+      subcategory: '1.1 ปฏิบัติการหน้างาน & SLA',
+      group: 'av',
+      color: '#22c55e',
+      size: 26,
+      priority: 2,
+      type: 'SOP / SLA',
+      status: 'มาตรฐานหลัก',
+      statusCls: '',
+      url: 'https://drive.google.com/file/d/1C1EkEo28rFQiavvqOR7KOH9SV8BxssVO/view',
+      desc: 'รับคำขอ (30 น.) → ตรวจพร้อม (30 น.) → จัดสรร → ติดตั้งทดสอบ (1-2 ชม. ก่อนเริ่ม) → คุมงาน → ตรวจคืน (30 น.) → บันทึก AppSheet',
+      links: ['av-handover', 'doc-appsheet-asset']
+    },
+    {
+      id: 'av-sop-master',
+      name: 'SOP Master ตู้แร็คเสียงกลาง & Signal Flow',
+      category: '1. งาน KLLC · ระบบโสตฯ (AV)',
+      subcategory: '1.2 คู่มือ SOP เครื่องเสียง 5 แบรนด์',
+      group: 'av',
+      color: '#22c55e',
+      size: 28,
+      priority: 2,
+      type: 'Google Doc',
+      status: 'Power Sequence',
+      statusCls: '',
+      url: 'https://docs.google.com/document/d/1ZHEWEh-sh5TQNrUg2gzfEYJ6y43wpqASr_V2Q6ZjP9E/edit',
+      desc: 'กฎเหล็กเปิดระบบบนลงล่าง (ไมค์ → มิกเซอร์ → DSP → แอมป์) และปิดล่างขึ้นบน (ปิด Power Amp ก่อนเสมอ)',
+      links: ['av-sop-presonus', 'av-sop-bose', 'av-sop-shure', 'av-sop-crown']
+    },
+    {
+      id: 'av-sop-presonus',
+      name: 'SOP PreSonus StudioLive 16 (USB WDM)',
+      category: '1. งาน KLLC · ระบบโสตฯ (AV)',
+      subcategory: '1.2 คู่มือ SOP เครื่องเสียง 5 แบรนด์',
+      group: 'av',
+      color: '#22c55e',
+      size: 22,
+      priority: 3,
+      type: 'Google Doc',
+      status: 'SOP',
+      statusCls: '',
+      url: 'https://docs.google.com/document/d/1n9BLwV7iUQfW7jRnk5yoRPr5E78iUTqmOy2j0xr-hts/edit',
+      desc: 'ตั้งค่า USB Audio Interface (StudioLive WDM 1/2), กดปุ่ม USB Fat Channel, Stereo Link และ Unity Gain 0 dB',
+      links: ['av-sop-master']
+    },
+    {
+      id: 'av-sop-bose',
+      name: 'SOP BOSE ControlSpace SP-24 & ขาตั้ง',
+      category: '1. งาน KLLC · ระบบโสตฯ (AV)',
+      subcategory: '1.2 คู่มือ SOP เครื่องเสียง 5 แบรนด์',
+      group: 'av',
+      color: '#22c55e',
+      size: 22,
+      priority: 3,
+      type: 'Google Doc',
+      status: 'SOP',
+      statusCls: '',
+      url: 'https://docs.google.com/document/d/1TJ_5Jxt-N1UUKtSiigas27uElHlK8Sb_Y87Rvn6U--I/edit',
+      desc: 'ห้ามกดเปลี่ยน Preset หน้าเครื่อง DSP และต้องเสียบ Safety Pin ล็อกขาตั้งลำโพงทุกครั้ง',
+      links: ['av-sop-master']
+    },
+    {
+      id: 'av-sop-shure',
+      name: 'SOP ไมค์ไร้สาย SHURE / TOA / RØDE',
+      category: '1. งาน KLLC · ระบบโสตฯ (AV)',
+      subcategory: '1.2 คู่มือ SOP เครื่องเสียง 5 แบรนด์',
+      group: 'av',
+      color: '#22c55e',
+      size: 22,
+      priority: 3,
+      type: 'Google Doc',
+      status: 'SOP',
+      statusCls: '',
+      url: 'https://docs.google.com/document/d/1df5H1VekbdYM4ui4ODq2xNOEcDnOPmWGmr4KB3NyA2k/edit',
+      desc: 'กางเสาอากาศรูปตัว V 45-60 องศา, ป้องกันไมค์หอน, และถอดถ่าน AA หลังจบงานทุกครั้ง',
+      links: ['av-sop-master']
+    },
+    {
+      id: 'av-sop-crown',
+      name: 'SOP เพาเวอร์แอมป์ CROWN XLi Series',
+      category: '1. งาน KLLC · ระบบโสตฯ (AV)',
+      subcategory: '1.2 คู่มือ SOP เครื่องเสียง 5 แบรนด์',
+      group: 'av',
+      color: '#22c55e',
+      size: 22,
+      priority: 3,
+      type: 'Google Doc',
+      status: 'SOP',
+      statusCls: '',
+      url: 'https://docs.google.com/document/d/1zV_RbBEPUFUb0gfKQBj7Xzzaer7LZ-_sFJrUEWM-OXU/edit',
+      desc: 'ตั้ง Gain ที่ตำแหน่ง 14:00 น., โหมด Stereo, เฝ้าระวังไฟ Clip LED สีแดง',
+      links: ['av-sop-master']
+    },
+    {
+      id: 'av-tor-p6',
+      name: 'พ.6 TOR ย้ายทีวี & ติดตั้งโปรเจคเตอร์ ห้องติว',
+      category: '1. งาน KLLC · ระบบโสตฯ (AV)',
+      subcategory: '1.3 จัดซื้อจัดจ้าง & ใบเสนอราคา',
+      group: 'av',
+      color: '#22c55e',
+      size: 24,
+      priority: 2,
+      type: 'Drive Folder',
+      status: 'Active TOR',
+      statusCls: 'orange',
+      url: 'https://drive.google.com/drive/folders/1bSRND4Yv4kVwhJfsTysQCWoBtez1roa7',
+      desc: 'รวมใบเสนอราคา 3 บริษัท (Aginix, ป๊อป นิคซ์, QT-256902359) และไฟล์ร่าง พ.6 TOR ห้องติวคอม 1-2',
+      links: ['pillar-docs']
+    },
+
+    // --- PILLAR 2: CCTV & SECURITY (6% + HIGH RISK) ---
+    {
+      id: 'pillar-cctv',
+      name: 'เสา 2: กล้อง CCTV & ความปลอดภัย (6%)',
+      category: '2. งาน KLLC · กล้อง CCTV',
+      subcategory: 'ภาพรวมระบบความปลอดภัยอาคาร A-B',
+      group: 'cctv',
+      color: '#ff6a26',
+      size: 38,
+      priority: 1,
+      type: 'Folder / Pillar',
+      status: 'ติดตามซ่อม/ความเสี่ยง',
+      statusCls: 'warn',
+      url: 'https://drive.google.com/drive/folders/1CogFcCPPLL87pq6YDZ9Zv_93mzoRD16R',
+      desc: 'แม้ค่าน้ำหนัก JD อยู่ที่ 6% แต่มีความเสี่ยงสูง (ของหาย ~150,000 บ. / PDPA / อาคาร A 45 จุด + อาคาร B 7 จุด)',
+      links: ['cctv-ssot', 'cctv-master-sheet', 'cctv-request-form', 'cctv-map-a', 'cctv-map-b', 'cctv-face-p1', 'kllc-3d']
+    },
+    {
+      id: 'cctv-ssot',
+      name: 'CCTV_MASTER_DATABASE_SSOT.md',
+      category: '2. งาน KLLC · กล้อง CCTV',
+      subcategory: '2.1 ฐานข้อมูลกลาง & สถานะกล้อง',
+      group: 'cctv',
+      color: '#ff6a26',
+      size: 30,
+      priority: 1,
+      type: 'Markdown SSOT',
+      status: 'Single Source',
+      statusCls: 'warn',
+      url: 'https://drive.google.com/file/d/1oNvd8V7A8fRopamlqXvIhld4jI6bN0yb/view',
+      desc: 'จุดอ้างอิงเดียวของกล้องอาคาร B (7 ตัว: ออนไลน์ 6, ออฟไลน์ B_CAM01 1) และอาคาร A (NVR 13 ช่อง: ออฟไลน์ D7, D8) + เคสความเสี่ยง',
+      links: ['cctv-risk-log', 'cctv-calibrated', 'cctv-master-sheet']
+    },
+    {
+      id: 'cctv-master-sheet',
+      name: 'Google Sheet: KLLC AV CCTV (5 แท็บ)',
+      category: '2. งาน KLLC · กล้อง CCTV',
+      subcategory: '2.1 ฐานข้อมูลกลาง & สถานะกล้อง',
+      group: 'cctv',
+      color: '#38bdf8',
+      size: 30,
+      priority: 1,
+      type: 'Google Sheet',
+      status: 'Live Sync Ready',
+      statusCls: 'blue',
+      url: 'https://docs.google.com/spreadsheets/d/1rxnx_U1aoH0IYcOJNG8kQaAEtYNj2XDhuc7Le6fuxNM/edit',
+      desc: 'ฐานทะเบียนครุภัณฑ์หลัก 5 แท็บ (02_Assets_Inventory + 03_CCTV_Map_&_Repair) เชื่อมตรงกับระบบ Command Center',
+      links: ['pillar-av', 'pillar-cctv', 'doc-daily-log']
+    },
+    {
+      id: 'cctv-risk-log',
+      name: 'CCTV_CASE_LOG_AND_RISK_RECORD_2569',
+      category: '2. งาน KLLC · กล้อง CCTV',
+      subcategory: '2.2 คำร้อง PDPA & บันทึกความเสี่ยง',
+      group: 'cctv',
+      color: '#ff6a26',
+      size: 26,
+      priority: 1,
+      type: 'Markdown Risk Log',
+      status: 'Critical Log',
+      statusCls: 'warn',
+      url: 'https://drive.google.com/file/d/1HsmG6S_oEOmWlRMqj1qZ-w566vd4mQw0/view',
+      desc: 'บันทึกเคสของหาย 3 เคส (~150,000 บ.), ประเด็นอาคาร A ไม่มี HDD และถูกตัดงบรีโนเวท, ข้อกฎหมาย PDPA',
+      links: ['cctv-ssot', 'cctv-request-form']
+    },
+    {
+      id: 'cctv-request-form',
+      name: 'ระบบคำร้องขอดูภาพ (CCTV Request Form)',
+      category: '2. งาน KLLC · กล้อง CCTV',
+      subcategory: '2.2 คำร้อง PDPA & บันทึกความเสี่ยง',
+      group: 'cctv',
+      color: '#38bdf8',
+      size: 24,
+      priority: 2,
+      type: 'Google Sheet',
+      status: 'PDPA Protocol',
+      statusCls: 'blue',
+      url: 'https://docs.google.com/spreadsheets/d/1-IErvQDXH8uuyLrJOOXmLngJSE1vVD0Oskbmsdtrrj8/edit',
+      desc: 'แบบฟอร์มรับคำร้องขอดู/ส่งออกภาพย้อนหลัง ต้องผ่านการลงนามอนุมัติตามระเบียบ PDPA',
+      links: ['cctv-risk-log', 'av-handover']
+    },
+    {
+      id: 'cctv-calibrated',
+      name: 'cctv_calibrated_master.json (45 จุด อาคาร A)',
+      category: '2. งาน KLLC · กล้อง CCTV',
+      subcategory: '2.3 ผังแปลน 2D & พิกัดกล้อง',
+      group: 'cctv',
+      color: '#ff6a26',
+      size: 24,
+      priority: 2,
+      type: 'JSON Database',
+      status: '45 Cameras',
+      statusCls: '',
+      url: 'https://drive.google.com/file/d/1LR4dq3iYbpf2uROkjkW6-HAvbeO4hWdk/view',
+      desc: 'พิกัด IP กล้อง พอร์ต PoE Switch และมุมกล้องอาคาร A ทั้ง 45 จุด',
+      links: ['cctv-map-a', 'cctv-ssot']
+    },
+    {
+      id: 'cctv-map-a',
+      name: 'ผัง 2D Interactive กล้องอาคาร A',
+      category: '2. งาน KLLC · กล้อง CCTV',
+      subcategory: '2.3 ผังแปลน 2D & พิกัดกล้อง',
+      group: 'cctv',
+      color: '#ff6a26',
+      size: 22,
+      priority: 2,
+      type: 'HTML 2D Map',
+      status: 'Interactive',
+      statusCls: '',
+      url: 'https://drive.google.com/file/d/1_T7rdFEAsmmQ1fh0cs1tqwBTp94gHvVx/view',
+      desc: 'แผนผัง 2D Interactive แสดงจุดติดตั้งกล้องอาคาร A',
+      links: ['cctv-calibrated', 'cctv-map-b']
+    },
+    {
+      id: 'cctv-map-b',
+      name: 'ผัง 2D Interactive กล้องอาคาร B (7 จุด)',
+      category: '2. งาน KLLC · กล้อง CCTV',
+      subcategory: '2.3 ผังแปลน 2D & พิกัดกล้อง',
+      group: 'cctv',
+      color: '#ff6a26',
+      size: 22,
+      priority: 2,
+      type: 'HTML 2D Map',
+      status: 'Interactive',
+      statusCls: '',
+      url: 'https://drive.google.com/file/d/1JwIz9H47BSOztD6FL1GWOi4ToUAI19Tc/view',
+      desc: 'แผนผัง 2D Interactive อาคาร B 7 จุด รวมถึง Main Gate & Sky Walk',
+      links: ['cctv-ssot', 'cctv-map-a']
+    },
+    {
+      id: 'cctv-face-p1',
+      name: 'Face Tracking Phase 1 & NVR Scripts',
+      category: '2. งาน KLLC · กล้อง CCTV',
+      subcategory: '2.4 โครงการ AI Face Tracking',
+      group: 'cctv',
+      color: '#ff6a26',
+      size: 26,
+      priority: 2,
+      type: 'Drive Folder',
+      status: 'Phase 1 Ready',
+      statusCls: 'orange',
+      url: 'https://drive.google.com/drive/folders/1kCObYsXCBeiDAzQOS-DKaXVBwuy4golj',
+      desc: 'ฐานข้อมูลใบหน้าบุคลากร 46-47 คน (iVMS-4200 / Hikvision FDLib) + สคริปต์ ISAPI & Webhook',
+      links: ['pillar-cctv', 'doc-poc-face']
+    },
+
+    // --- DOCS, TOR, ASSETS ---
+    {
+      id: 'pillar-docs',
+      name: 'งานเอกสาร TOR, ครุภัณฑ์ & ส่งมอบงาน',
+      category: '3. งานเอกสาร · TOR & ครุภัณฑ์',
+      subcategory: 'ศูนย์รวมเอกสารทางการ',
+      group: 'docs',
+      color: '#38bdf8',
+      size: 36,
+      priority: 1,
+      type: 'Folder / Pillar',
+      status: '487 รายการ',
+      statusCls: 'blue',
+      url: 'https://drive.google.com/drive/folders/1-_eOoBWqmTF_sWjf7Hwfvz4zSKRhH6mK',
+      desc: 'ทะเบียนครุภัณฑ์ 2569 (487 รายการ), แผนงบประมาณ 2570-2571, เอกสารส่งมอบงาน และระบบตรวจเช็กรายวัน',
+      links: ['av-handover', 'av-tor-2570', 'av-tor-2571', 'doc-appsheet-asset', 'doc-daily-log', 'doc-meeting-5']
+    },
+    {
+      id: 'av-handover',
+      name: 'เอกสารส่งมอบงาน Master Package KLLC',
+      category: '3. งานเอกสาร · TOR & ครุภัณฑ์',
+      subcategory: '3.1 Job Description & Handover',
+      group: 'docs',
+      color: '#38bdf8',
+      size: 28,
+      priority: 1,
+      type: 'Google Doc',
+      status: 'Master JD',
+      statusCls: 'blue',
+      url: 'https://docs.google.com/document/d/15WMmNqTd4_a3Wr_L3YbTgGDzBKZ1hZxFeqPhqHiC6x4/edit',
+      desc: 'สรุป JD 100%, SOP 5 ระบบ, SLA 7 ขั้นตอน, ปฏิทินงานประจำวัน/สัปดาห์/เดือน และรายชื่อผู้ประสานงาน',
+      links: ['av-sla', 'av-sop-master', 'doc-job68']
+    },
+    {
+      id: 'doc-job68',
+      name: 'ตาราง Job 68: งานอุปกรณ์โสตฯ และพื้นที่',
+      category: '3. งานเอกสาร · TOR & ครุภัณฑ์',
+      subcategory: '3.1 Job Description & Handover',
+      group: 'docs',
+      color: '#38bdf8',
+      size: 22,
+      priority: 2,
+      type: 'Google Sheet',
+      status: 'KPI 100%',
+      statusCls: 'blue',
+      url: 'https://docs.google.com/spreadsheets/d/1DCnYnxpJv7Gx2EIehO0F8j2Wgzw5f5yBod3Jq7HD4h8/edit',
+      desc: 'ต้นฉบับกรอบการประเมินค่าน้ำหนักภาระงานประจำปีของบอส',
+      links: ['av-handover']
+    },
+    {
+      id: 'av-tor-2570',
+      name: 'TOR งบลงทุนปี 2570 (7.64 ล้านบาท / 6 รายการ)',
+      category: '3. งานเอกสาร · TOR & ครุภัณฑ์',
+      subcategory: '3.2 แผนงบประมาณ & TOR 2570-2571',
+      group: 'docs',
+      color: '#38bdf8',
+      size: 28,
+      priority: 1,
+      type: 'Master Index',
+      status: 'ล็อกฟอร์มสมบูรณ์',
+      statusCls: '',
+      url: 'https://drive.google.com/file/d/1_9lo8O4GDygwZ-zw8IixI-Jpn2fMtcOW/view',
+      desc: 'สารบบ TOR_MASTER_INDEX_2570_2571.md รวมตาราง OSM 6 รายการ, Master TOR, สไลด์นำเสนอ 7.64 ล้านบาท',
+      links: ['av-tor-2571', 'pillar-av']
+    },
+    {
+      id: 'av-tor-2571',
+      name: 'คำของบแผ่นดินปี 2571 (AV / PC / Server / โต๊ะ)',
+      category: '3. งานเอกสาร · TOR & ครุภัณฑ์',
+      subcategory: '3.2 แผนงบประมาณ & TOR 2570-2571',
+      group: 'docs',
+      color: '#38bdf8',
+      size: 25,
+      priority: 2,
+      type: 'Drive Folder',
+      status: 'ส่งพัฒนาฯ แล้ว',
+      statusCls: 'blue',
+      url: 'https://drive.google.com/drive/folders/1Xgnf2hHqO5j-a-IjbjVCTjMfLqJhXgGZ',
+      desc: 'ชุดคำของบลงทุนปี 2571 แยก 4 หมวด (ชุดโสตฯ, PC ทดแทน, Server ทดแทน, โต๊ะเก้าอี้) + ใบเสนอราคา 3 บริษัท',
+      links: ['av-tor-2570']
+    },
+    {
+      id: 'doc-appsheet-asset',
+      name: 'Google Sheet: KLLC สำรวจครุภัณฑ์ 69 (487 ชิ้น)',
+      category: '3. งานเอกสาร · TOR & ครุภัณฑ์',
+      subcategory: '3.3 ทะเบียนครุภัณฑ์ & AppSheet',
+      group: 'docs',
+      color: '#38bdf8',
+      size: 28,
+      priority: 1,
+      type: 'Google Sheet',
+      status: 'ตรวจครบ 100%',
+      statusCls: '',
+      url: 'https://docs.google.com/spreadsheets/d/1rl8BN1Isw1Zb17uukpl2wr0dKP-NiAewO68CYeUyHUM/edit',
+      desc: 'ซิงก์ AppSheet ครบ 487 รายการ (IT/AV 377, คอยล์เย็น 87, คอยล์ร้อน 11, รอชี้แจง 12) + Matching ห้องสตูดิโอ',
+      links: ['pillar-docs', 'av-sla']
+    },
+    {
+      id: 'doc-daily-log',
+      name: 'KLLC Daily AV/CCTV Inspection Log',
+      category: '3. งานเอกสาร · TOR & ครุภัณฑ์',
+      subcategory: '3.3 ทะเบียนครุภัณฑ์ & AppSheet',
+      group: 'docs',
+      color: '#38bdf8',
+      size: 22,
+      priority: 2,
+      type: 'Google Sheet',
+      status: 'Daily Log',
+      statusCls: '',
+      url: 'https://docs.google.com/spreadsheets/d/1TNBCW9oQ-JV9fACbm9su7p7gIwzPmqEf6fiGMIwZY8c/edit',
+      desc: 'บันทึกการตรวจเช็คระบบภาพ-เสียงและกล้องประจำวัน',
+      links: ['cctv-master-sheet', 'pillar-docs']
+    },
+    {
+      id: 'doc-meeting-5',
+      name: 'วาระประชุมฝ่ายเทคโนโลยีฯ ครั้งที่ 5 (24 พ.ย. 69)',
+      category: '3. งานเอกสาร · TOR & ครุภัณฑ์',
+      subcategory: '3.4 วาระประชุม & ข้อเสนอ POC',
+      group: 'docs',
+      color: '#38bdf8',
+      size: 22,
+      priority: 1,
+      type: 'PDF Document',
+      status: 'ล่าสุด 24 พ.ย.',
+      statusCls: 'orange',
+      url: 'https://drive.google.com/file/d/1GGl9n8g_5fBDZ-bhZoQ73NOZyK21kyLd/view',
+      desc: 'เอกสารวาระการประชุมฝ่ายเทคโนโลยีและพื้นที่การเรียนรู้ล่าสุด',
+      links: ['pillar-docs']
+    },
+    {
+      id: 'doc-poc-face',
+      name: 'ข้อเสนอ POC ระบบจดจำใบหน้าทางเข้า KLLC',
+      category: '3. งานเอกสาร · TOR & ครุภัณฑ์',
+      subcategory: '3.4 วาระประชุม & ข้อเสนอ POC',
+      group: 'docs',
+      color: '#38bdf8',
+      size: 22,
+      priority: 2,
+      type: 'PDF Document',
+      status: 'POC Proposal',
+      statusCls: 'blue',
+      url: 'https://drive.google.com/file/d/1FQTm96wlVK6ta6D1iejzOEZTbccjQeLo/view',
+      desc: 'เอกสารข้อเสนอโครงการทดสอบระบบจดจำใบหน้าทางเข้าอาคาร',
+      links: ['cctv-face-p1']
+    },
+    {
+      id: 'kllc-3d',
+      name: 'หน้าจอ 3 มิติผู้บริหาร (index.html)',
+      category: '3. งานเอกสาร · TOR & ครุภัณฑ์',
+      subcategory: '3.5 Web Command UI',
+      group: 'docs',
+      color: '#ff2e2e',
+      size: 28,
+      priority: 1,
+      type: 'Web App (3D)',
+      status: 'GitHub Pages',
+      statusCls: '',
+      url: './index.html',
+      desc: 'แผนผัง 3 มิติเชื่อมโยงระบบ AV, CCTV และครุภัณฑ์ สำหรับผู้บริหาร KLLC',
+      links: ['pillar-av', 'pillar-cctv', 'hub-boss']
+    },
+
+    // --- 4 PILLARS & AI GOVERNANCE ---
+    {
+      id: 'pillar-ai',
+      name: 'AI Agent Hub & ท่อส่งไฟล์อัตโนมัติ',
+      category: '4. ระบบ AI & โครงสร้าง 4 เสาหลัก',
+      subcategory: '4.1 AI Governance (ลดความซ้ำซ้อน)',
+      group: 'pillars',
+      color: '#a855f7',
+      size: 34,
+      priority: 1,
+      type: 'AI Hub',
+      status: 'Zero-Review Flow',
+      statusCls: 'purple',
+      url: 'https://drive.google.com/drive/folders/1QVyBFNDfliYs_7VxLdZ5RRmftttDu8OJ',
+      desc: 'ศูนย์กลางระบบ Prompt, Rules, Directory Map และท่อส่งไฟล์ inbox → ถังรวม ห้ามลบ → ปลายทาง เพื่อไม่ให้ AI ทำงานทับซ้อน',
+      links: ['ai-inbox', 'ai-vault', 'ai-rules']
+    },
+    {
+      id: 'ai-inbox',
+      name: 'inbox (จุดรับไฟล์เข้าทางเดียว)',
+      category: '4. ระบบ AI & โครงสร้าง 4 เสาหลัก',
+      subcategory: '4.1 AI Governance (ลดความซ้ำซ้อน)',
+      group: 'pillars',
+      color: '#a855f7',
+      size: 22,
+      priority: 2,
+      type: 'Dropzone Folder',
+      status: 'Auto 12:00 / 21:00',
+      statusCls: 'purple',
+      url: 'https://drive.google.com/drive/folders/1gAjmyJRPaq9mymqtAdvUBu8jNLuHyW_N',
+      desc: 'รับไฟล์ใหม่ทั้งหมดเข้าสู่ระบบคัดแยกอัตโนมัติ ไม่ให้ไฟล์หลุดไปปะปนในโฟลเดอร์งาน KLLC',
+      links: ['pillar-ai', 'ai-vault']
+    },
+    {
+      id: 'ai-vault',
+      name: 'ถังรวม ห้ามลบ (คลังสำรอง 3 ชั้น)',
+      category: '4. ระบบ AI & โครงสร้าง 4 เสาหลัก',
+      subcategory: '4.1 AI Governance (ลดความซ้ำซ้อน)',
+      group: 'pillars',
+      color: '#a855f7',
+      size: 22,
+      priority: 2,
+      type: 'Immutable Vault',
+      status: 'Zero-Deletion',
+      statusCls: 'purple',
+      url: 'https://drive.google.com/drive/folders/1IwTMxO3Nn2XnqENRQGON5oJab1nCCxvd',
+      desc: 'สำรองไฟล์แยกตาม ปี พ.ศ. / เดือน / วันที่ ถาวร 100%',
+      links: ['pillar-ai']
+    },
+    {
+      id: 'ai-rules',
+      name: 'กฎเหล็ก Drive 3 เสา & Directory Map',
+      category: '4. ระบบ AI & โครงสร้าง 4 เสาหลัก',
+      subcategory: '4.1 AI Governance (ลดความซ้ำซ้อน)',
+      group: 'pillars',
+      color: '#a855f7',
+      size: 24,
+      priority: 1,
+      type: 'Master Spec',
+      status: 'Mandatory',
+      statusCls: 'purple',
+      url: 'https://drive.google.com/file/d/1KDtEA38__d9GrnpzTtSJEBvDUKgc4DaS/view',
+      desc: 'กติกาแยก 1. งาน KLLC / 2. ส่วนตัวและร้านค้า / 9. คลังระบบหลังบ้าน พร้อมตาราง File ID จริงทั้งหมด',
+      links: ['pillar-ai', 'hub-boss']
+    },
+    {
+      id: 'ext-dododix',
+      name: 'เสาธุรกิจ: DODODIX E-Commerce & ร้านค้า',
+      category: '4. ระบบ AI & โครงสร้าง 4 เสาหลัก',
+      subcategory: '4.2 ธุรกิจส่วนตัว & การเงิน (เสา 2 Drive)',
+      group: 'pillars',
+      color: '#f59e0b',
+      size: 26,
+      priority: 2,
+      type: 'Drive Shortcut',
+      status: 'TikTok / Etsy',
+      statusCls: 'orange',
+      url: 'https://drive.google.com/drive/folders/1zss8gfrllSA9kDk3VwCEUrrTm0jwstm4',
+      desc: 'คลังข้อมูลค้าขาย DODODIX (TikTok Shop / Shopee / Etsy) แยกชัดเจนจากงานสถาบัน KLLC',
+      links: ['hub-boss']
+    },
+    {
+      id: 'ext-bmt',
+      name: 'เสาสื่อสร้างสรรค์: Bikini Queen BMT',
+      category: '4. ระบบ AI & โครงสร้าง 4 เสาหลัก',
+      subcategory: '4.2 ธุรกิจส่วนตัว & การเงิน (เสา 2 Drive)',
+      group: 'pillars',
+      color: '#f59e0b',
+      size: 24,
+      priority: 3,
+      type: 'Drive Shortcut',
+      status: 'Creative AI',
+      statusCls: 'orange',
+      url: 'https://drive.google.com/drive/folders/16BqpWxaUuT1MZBwbmuuJ1ypFQrajm6AF',
+      desc: 'Workflow สร้างสรรค์ภาพ/สื่อ 4K (ComfyUI / FLUX) อยู่ในโซนสื่อส่วนตัว ไม่ปนกับงาน KLLC',
+      links: ['hub-boss']
+    },
+    {
+      id: 'ext-dividend',
+      name: 'เสาการลงทุน: Dividend Wealth Engine',
+      category: '4. ระบบ AI & โครงสร้าง 4 เสาหลัก',
+      subcategory: '4.2 ธุรกิจส่วนตัว & การเงิน (เสา 2 Drive)',
+      group: 'pillars',
+      color: '#f59e0b',
+      size: 24,
+      priority: 2,
+      type: 'Drive Shortcut',
+      status: 'LH · TTB · TDEX · 1DIV',
+      statusCls: '',
+      url: 'https://drive.google.com/drive/folders/1QA_OfF6JB_eoAcsyEFKT4JbxlDtagWSw',
+      desc: 'พอร์ตลงทุนเน้นเงินปันผล XD Calendar และ Dividend Report',
+      links: ['hub-boss']
+    }
+  ];
+
+  // =========================================================================
+  // 2. TAB NAVIGATION
+  // =========================================================================
+  const tabs = document.querySelectorAll('.nav-tab');
+  const panes = document.querySelectorAll('.view-pane');
+  let cy = null;
+
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabs.forEach(b => b.classList.remove('active'));
+      panes.forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const target = document.getElementById('view-' + btn.dataset.tab);
+      target.classList.add('active');
+      if (btn.dataset.tab === 'graph' && cy) {
+        setTimeout(() => { cy.resize(); cy.fit(undefined, 36); }, 60);
+      }
+    });
+  });
+
+  // =========================================================================
+  // 3. SPIDERWEB GRAPH (CYTOSCAPE.JS)
+  // =========================================================================
+  function initGraph() {
+    const elements = [];
+    ITEMS.forEach(item => {
+      elements.push({
+        data: {
+          id: item.id,
+          label: item.name,
+          color: item.color,
+          size: item.size,
+          group: item.group
+        }
+      });
+    });
+
+    const edgeSet = new Set();
+    ITEMS.forEach(item => {
+      (item.links || []).forEach(targetId => {
+        if (!ITEMS.find(x => x.id === targetId)) return;
+        const key = [item.id, targetId].sort().join('--');
+        if (!edgeSet.has(key)) {
+          edgeSet.add(key);
+          elements.push({
+            data: { id: key, source: item.id, target: targetId }
+          });
+        }
+      });
+    });
+
+    cy = cytoscape({
+      container: document.getElementById('cy'),
+      elements,
+      style: [
+        {
+          selector: 'node',
+          style: {
+            'background-color': 'data(color)',
+            'width': 'data(size)',
+            'height': 'data(size)',
+            'label': 'data(label)',
+            'color': '#f1f5f9',
+            'font-family': 'Noto Sans Thai, sans-serif',
+            'font-size': '11px',
+            'font-weight': '600',
+            'text-valign': 'bottom',
+            'text-margin-y': '6px',
+            'text-wrap': 'wrap',
+            'text-max-width': '130px',
+            'text-background-color': '#07090d',
+            'text-background-opacity': 0.78,
+            'text-background-padding': '3px',
+            'border-width': 2,
+            'border-color': 'rgba(255,255,255,0.28)'
+          }
+        },
+        {
+          selector: 'edge',
+          style: {
+            'width': 1.5,
+            'line-color': 'rgba(148, 163, 184, 0.28)',
+            'curve-style': 'bezier'
+          }
+        },
+        {
+          selector: '.dimmed',
+          style: { 'opacity': 0.14 }
+        },
+        {
+          selector: '.highlighted',
+          style: {
+            'opacity': 1,
+            'border-color': '#ffffff',
+            'border-width': 3,
+            'line-color': '#ff6a26',
+            'width': 2.6,
+            'z-index': 99
+          }
+        }
+      ],
+      layout: { name: 'cose', animate: true, animationDuration: 500, nodeRepulsion: 9500, idealEdgeLength: 105 }
+    });
+
+    cy.on('tap', 'node', evt => {
+      const id = evt.target.id();
+      highlightNode(id);
+      openInspector(id);
+    });
+
+    cy.on('tap', evt => {
+      if (evt.target === cy) {
+        cy.elements().removeClass('dimmed highlighted');
+      }
+    });
+
+    // Group Filter Pills
+    document.querySelectorAll('#graph-filters .fpill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('#graph-filters .fpill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        const g = pill.dataset.group;
+        cy.elements().removeClass('dimmed highlighted');
+        if (g !== 'all') {
+          const matched = cy.nodes().filter(n => n.data('group') === g || n.id() === 'hub-boss');
+          const hood = matched.closedNeighborhood();
+          cy.elements().not(hood).addClass('dimmed');
+          matched.addClass('highlighted');
+        }
+      });
+    });
+
+    // Layout Selector
+    document.getElementById('layout-select').addEventListener('change', e => {
+      const val = e.target.value;
+      const opts = val === 'cose'
+        ? { name: 'cose', animate: true, nodeRepulsion: 9500, idealEdgeLength: 105 }
+        : val === 'concentric'
+        ? { name: 'concentric', animate: true, minNodeSpacing: 45 }
+        : { name: 'breadthfirst', directed: true, animate: true, spacingFactor: 1.25, roots: '#hub-boss' };
+      cy.layout(opts).run();
+    });
+
+    document.getElementById('btn-fit').addEventListener('click', () => {
+      cy.elements().removeClass('dimmed highlighted');
+      cy.fit(undefined, 36);
+    });
+  }
+
+  function highlightNode(id) {
+    if (!cy) return;
+    const node = cy.getElementById(id);
+    if (!node.length) return;
+    cy.elements().addClass('dimmed').removeClass('highlighted');
+    node.closedNeighborhood().removeClass('dimmed').addClass('highlighted');
+  }
+
+  // =========================================================================
+  // 4. INSPECTOR DRAWER
+  // =========================================================================
+  const inspector = document.getElementById('inspector');
+  document.getElementById('insp-close').addEventListener('click', () => {
+    inspector.classList.remove('open');
+  });
+
+  function openInspector(id) {
+    const item = ITEMS.find(x => x.id === id);
+    if (!item) return;
+    document.getElementById('insp-cat').textContent = `${item.category} › ${item.subcategory}`;
+    document.getElementById('insp-title').textContent = item.name;
+
+    // Collect bidirectional links
+    const linkedIds = new Set(item.links || []);
+    ITEMS.forEach(other => {
+      if ((other.links || []).includes(item.id)) linkedIds.add(other.id);
+    });
+    const linkedItems = Array.from(linkedIds).map(lid => ITEMS.find(x => x.id === lid)).filter(Boolean);
+
+    const isExternal = item.url.startsWith('http');
+    const html = `
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+        <span class="badge ${item.statusCls}">${item.status}</span>
+        <span class="badge blue">${item.type}</span>
+      </div>
+      <div class="insp-box">${item.desc}</div>
+      <a class="btn-link primary" style="width:100%; justify-content:center; padding:10px;" href="${item.url}" ${isExternal ? 'target="_blank" rel="noopener"' : ''}>
+        ${isExternal ? '🔗 เปิดไฟล์ / โฟลเดอร์จริงใน Google Drive' : '🎯 เปิดหน้าจอระบบที่เชื่อมโยง'}
+      </a>
+      <div class="insp-sec">🕸️ เครือข่ายที่เชื่อมโยงถึงกัน (${linkedItems.length} จุด)</div>
+      ${linkedItems.map(li => `
+        <div class="rel-chip" onclick="jumpToNode('${li.id}')">
+          <div>
+            <div style="font-weight:600;">${li.name}</div>
+            <div style="font-size:10.5px; color:var(--muted);">${li.category}</div>
+          </div>
+          <span style="color:var(--blue); font-size:11px;">เปิด →</span>
+        </div>
+      `).join('')}
+    `;
+    document.getElementById('insp-body').innerHTML = html;
+    inspector.classList.add('open');
+  }
+
+  window.jumpToNode = function(id) {
+    openInspector(id);
+    highlightNode(id);
+  };
+
+  // =========================================================================
+  // 5. WORKLOAD & JD ANALYSIS RENDERER
+  // =========================================================================
+  function renderWorkload() {
+    const jdItems = [
+      { label: '1.1 จัดเตรียม ควบคุม อำนวยความสะดวกโสตฯ (250 ครั้ง/ปี)', pct: 15, color: '#22c55e' },
+      { label: '1.2 บริการอุปกรณ์โสตฯ ประจำห้องและกิจกรรม (250 ครั้ง/ปี)', pct: 10, color: '#22c55e' },
+      { label: '1.3 ประสานงานขอใช้อุปกรณ์และพื้นที่ (250 ครั้ง/ปี)', pct: 10, color: '#22c55e' },
+      { label: '1.4 ตรวจเช็กสต็อกโสตฯ & สำรวจแทงจำหน่าย (12 ครั้ง/ปี)', pct: 12, color: '#16a34a' },
+      { label: '2.1-2.3 บริการพื้นที่ อาคาร A-B + จัดผัง + Q&A (250 ครั้ง/ปี)', pct: 30, color: '#38bdf8' },
+      { label: '2.4 รายงานสถิติการใช้บริการรายเดือน (12 ครั้ง/ปี)', pct: 10, color: '#0ea5e9' },
+      { label: '3. ระบบกล้อง CCTV อาคาร A-B, ขอดูภาพ PDPA, ร่าง TOR (8 ครั้ง/ปี)', pct: 6, color: '#ff6a26' },
+      { label: '4-5. ระบบอัตโนมัติ AppSheet (2%) + นักศึกษาฝึกงาน/อื่นๆ (5%)', pct: 7, color: '#a855f7' }
+    ];
+    document.getElementById('jd-breakdown').innerHTML = jdItems.map(j => `
+      <div class="jd-row">
+        <div class="jd-top"><span>${j.label}</span><strong style="font-family:'JetBrains Mono',monospace;">${j.pct}%</strong></div>
+        <div class="jd-bar"><div class="jd-fill" style="width:${Math.min(j.pct * 3, 100)}%; background:${j.color};"></div></div>
+      </div>
+    `).join('');
+
+    const risks = [
+      { title: 'กล้อง B_CAM01 ออฟไลน์ (อาคาร B ชั้น 1 โถง VDW 2)', sub: 'สถานะ: Network disconnected — รอช่างเช็กสาย', badge: 'ส่งซ่อม', cls: 'warn', id: 'cctv-ssot' },
+      { title: 'กล้องอาคาร A ออฟไลน์ 2 ช่อง (D7 KLIX, D8 Cam 01)', sub: 'Network is unreachable + ประเด็นความเสี่ยงตัดงบรีโนเวท', badge: 'เฝ้าระวัง', cls: 'warn', id: 'cctv-risk-log' },
+      { title: 'คอยล์เย็น/แอร์ส่วนต่าง 12 เครื่อง (จาก 487 รายการ)', sub: 'สถานะ: ยังไม่พบ — รอผู้รับเหมาชี้แจงพิกัด', badge: 'รอชี้แจง', cls: 'orange', id: 'doc-appsheet-asset' },
+      { title: 'งบลงทุนโสตฯ 2570 (7.64 ล.) & คำของบ 2571', sub: 'ติดตามเข้าที่ประชุม + พ.6 TOR ย้ายทีวี/โปรเจคเตอร์ห้องติว', badge: 'Active TOR', cls: 'blue', id: 'av-tor-2570' }
+    ];
+    document.getElementById('risk-list').innerHTML = risks.map(r => `
+      <div class="rel-chip" onclick="openInspector('${r.id}')" style="padding:10px 12px;">
+        <div>
+          <div style="font-weight:600; font-size:12.5px;">${r.title}</div>
+          <div style="font-size:11px; color:var(--muted); margin-top:2px;">${r.sub}</div>
+        </div>
+        <span class="badge ${r.cls}">${r.badge}</span>
+      </div>
+    `).join('');
+
+    const routines = [
+      { id: 'r1', freq: 'Daily', text: 'เปิดไฟ/แอร์พื้นที่การเรียนรู้ + ตรวจห้องสัมมนา 100 ที่นั่ง & ห้องคอมฯ' },
+      { id: 'r2', freq: 'Daily', text: 'สแตนด์บายซัพพอร์ตระบบ AV + ตรวจเช็กสถานะกล้อง NVR และปิดล็อกระบบหลังเลิกงาน' },
+      { id: 'r3', freq: 'Weekly', text: 'เคลียร์บันทึกค้างใน AppSheet + เช็กถ่าน AA/AAA และสาย HDMI/XLR สำรอง' },
+      { id: 'r4', freq: 'Weekly', text: 'ทดสอบตู้แร็คเคลื่อนที่ (Mobile Rack) ประจำอาคาร A และอาคาร B' },
+      { id: 'r5', freq: 'Monthly', text: 'สรุปสถิติผู้เข้าใช้บริการรายเดือน (ส่งภายในวันที่ 1) + ประชุมฝ่ายเทคโนโลยีฯ' },
+      { id: 'r6', freq: 'Quarterly', text: 'สำรวจครุภัณฑ์ชำรุดเสนอแทงจำหน่าย (เป้าหมาย 6 ครั้ง/ปี)' }
+    ];
+    const saved = JSON.parse(localStorage.getItem('kllc_routine_chk') || '{}');
+    const chkWrap = document.getElementById('routine-checklist');
+    chkWrap.innerHTML = routines.map(r => `
+      <label class="chk-item ${saved[r.id] ? 'done' : ''}" data-rid="${r.id}">
+        <input type="checkbox" ${saved[r.id] ? 'checked' : ''} />
+        <div>
+          <div class="chk-text">${r.text}</div>
+          <div class="chk-meta">รอบ: ${r.freq}</div>
+        </div>
+      </label>
+    `).join('');
+    chkWrap.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('change', e => {
+        const lbl = e.target.closest('.chk-item');
+        const rid = lbl.dataset.rid;
+        lbl.classList.toggle('done', e.target.checked);
+        saved[rid] = e.target.checked;
+        localStorage.setItem('kllc_routine_chk', JSON.stringify(saved));
+      });
+    });
+    document.getElementById('btn-reset-chk').addEventListener('click', () => {
+      localStorage.removeItem('kllc_routine_chk');
+      renderWorkload();
+    });
+
+    const slaSteps = [
+      '1. รับแจ้งคำขอใช้บริการ (ภายใน 30 นาที) — Line KLLC / 7402 / เคาน์เตอร์',
+      '2. ตรวจสอบความพร้อมห้อง & อุปกรณ์ (ภายใน 30 นาที)',
+      '3. พิจารณาจัดสรรและยืนยันคิว (หรือเสนออุปกรณ์ทดแทน)',
+      '4. ติดตั้งและทดสอบระบบภาพ-เสียง (1-2 ชม. ก่อนเริ่มงาน)',
+      '5. ควบคุมดูแลตลอดการจัดกิจกรรม (Audio / Visual / Zoom)',
+      '6. ตรวจรับคืน ถอดถ่านไมค์ ม้วนสาย ล็อกตู้ (ภายใน 30 นาทีหลังเลิกงาน)',
+      '7. บันทึกสถิติลง AppSheet เพื่อสรุปรายงานประจำเดือน'
+    ];
+    document.getElementById('sla-flow').innerHTML = slaSteps.map(s => `
+      <div style="padding:8px 11px; background:rgba(255,255,255,0.03); border-left:3px solid var(--green); border-radius:4px; margin-bottom:7px; font-size:12.5px;">
+        ${s}
+      </div>
+    `).join('');
+  }
+
+  // =========================================================================
+  // 6. TAXONOMY & FUZZY SEARCH (FUSE.JS)
+  // =========================================================================
+  let fuse = null;
+  function initTaxonomy() {
+    fuse = new Fuse(ITEMS, {
+      keys: ['name', 'category', 'subcategory', 'desc', 'type', 'status'],
+      threshold: 0.36
+    });
+
+    const cats = [...new Set(ITEMS.map(i => i.category))];
+    const catSel = document.getElementById('cat-filter');
+    cats.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      catSel.appendChild(opt);
+    });
+
+    function updateSubcats() {
+      const cVal = catSel.value;
+      const subSel = document.getElementById('subcat-filter');
+      const subs = [...new Set(ITEMS.filter(i => cVal === 'all' || i.category === cVal).map(i => i.subcategory))];
+      subSel.innerHTML = '<option value="all">ทุกหมวดย่อย (Subcategory)</option>';
+      subs.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s; opt.textContent = s;
+        subSel.appendChild(opt);
+      });
+    }
+    updateSubcats();
+
+    function renderTaxGrid() {
+      const q = document.getElementById('search-input').value.trim();
+      const cVal = catSel.value;
+      const sVal = document.getElementById('subcat-filter').value;
+      const sortVal = document.getElementById('sort-filter').value;
+
+      let list = q ? fuse.search(q).map(r => r.item) : [...ITEMS];
+      if (cVal !== 'all') list = list.filter(i => i.category === cVal);
+      if (sVal !== 'all') list = list.filter(i => i.subcategory === sVal);
+
+      if (sortVal === 'priority') list.sort((a, b) => a.priority - b.priority);
+      else if (sortVal === 'name') list.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+
+      document.getElementById('tax-count').textContent = `${list.length} รายการ`;
+      document.getElementById('tax-grid').innerHTML = list.map(i => `
+        <div class="tax-card" onclick="openInspector('${i.id}')">
+          <div>
+            <div class="tax-cat">${i.category} › ${i.subcategory}</div>
+            <div class="tax-title">${i.name}</div>
+            <div class="tax-desc">${i.desc}</div>
+          </div>
+          <div class="tax-foot">
+            <span class="badge ${i.statusCls}">${i.status}</span>
+            <span style="font-size:11.5px; color:var(--blue);">${i.type} · ดูรายละเอียด →</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('search-input').addEventListener('input', renderTaxGrid);
+    catSel.addEventListener('change', () => { updateSubcats(); renderTaxGrid(); });
+    document.getElementById('subcat-filter').addEventListener('change', renderTaxGrid);
+    document.getElementById('sort-filter').addEventListener('change', renderTaxGrid);
+
+    // Keyboard shortcut '/' to search
+    document.addEventListener('keydown', e => {
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+        e.preventDefault();
+        document.querySelector('[data-tab="taxonomy"]').click();
+        document.getElementById('search-input').focus();
+      }
+    });
+
+    renderTaxGrid();
+  }
+
+  // =========================================================================
+  // 7. LIVE GOOGLE SHEETS SYNC (GVIZ JSONP/FETCH) & EXPORT
+  // =========================================================================
+  window.syncSheet = async function(sheetId, label) {
+    const statusEl = document.getElementById('sync-status');
+    const prevEl = document.getElementById('sync-preview');
+    statusEl.textContent = `กำลังเชื่อมต่อ ${label}...`;
+    prevEl.textContent = `Fetching https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json ...`;
+    try {
+      const res = await fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`);
+      const text = await res.text();
+      if (!text.includes('google.visualization.Query.setResponse')) {
+        throw new Error('Sheet ต้องเปิดสิทธิ์แชร์เป็น "ทุกคนที่มีลิงก์ (Viewer)" ก่อนจึงจะดึงสดจาก Browser ได้');
+      }
+      const jsonStr = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+      const data = JSON.parse(jsonStr);
+      const cols = data.table.cols.map(c => c.label || c.id);
+      const rows = data.table.rows.slice(0, 8).map(r => r.c.map(cell => cell ? (cell.f || cell.v || '') : ''));
+      statusEl.textContent = `✅ ซิงก์ ${label} สำเร็จ (${data.table.rows.length} แถว)`;
+      prevEl.textContent = JSON.stringify({ sheet: label, totalRows: data.table.rows.length, columns: cols, sampleRows: rows }, null, 2);
+    } catch (err) {
+      statusEl.textContent = '⚠️ Sheet เป็น Private (ใช้โหมดเปิดลิงก์ตรง)';
+      prevEl.innerHTML = `ไม่สามารถดึงข้ามโดเมนแบบอัตโนมัติได้เนื่องจากสิทธิ์ Sheet ยังไม่เป็น Public Viewer:\n${err.message}\n\n👉 <a href="https://docs.google.com/spreadsheets/d/${sheetId}/edit" target="_blank" style="color:#38bdf8">คลิกที่นี่เพื่อเปิด ${label} ใน Google Sheets โดยตรง</a>`;
+    }
+  };
+
+  document.getElementById('btn-export-json').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), commander: 'Wiphas On-nom', items: ITEMS }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'kllc_spiderweb_taxonomy.json';
+    a.click();
+  });
+
+  // Boot
+  initGraph();
+  renderWorkload();
+  initTaxonomy();
+  </script>
+</body>
+</html>
