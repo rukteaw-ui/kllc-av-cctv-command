@@ -105,12 +105,60 @@
     }
     .fpill:hover { color: #fff; border-color: var(--border-hi); }
     .fpill.active { color: #fff; background: rgba(255, 106, 38, 0.2); border-color: var(--orange); }
-    #cy { flex: 1; width: 100%; height: 100%; min-height: 400px; }
+    #cy { flex: 1; width: 100%; height: 100%; min-height: 400px; display: none; }
+    #cy.active { display: block; }
+
+    /* Structured Easy-to-Read Spiderweb Canvas */
+    .web-board {
+      flex: 1; position: relative; overflow-y: auto; overflow-x: auto;
+      padding: 20px 24px 72px; display: none;
+    }
+    .web-board.active { display: block; }
+    .web-stage {
+      position: relative; min-width: 960px; max-width: 1420px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1.05fr 1.25fr; gap: 48px; align-items: start;
+    }
+    #web-svg {
+      position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;
+    }
+    .web-path {
+      fill: none; stroke: rgba(148, 163, 184, 0.2); stroke-width: 1.6;
+      transition: stroke 0.2s, stroke-width 0.2s, opacity 0.2s;
+    }
+    .web-path.dim { opacity: 0.08; }
+    .web-path.lit { stroke: #ff6a26; stroke-width: 2.8; opacity: 1; filter: drop-shadow(0 0 6px rgba(255,106,38,0.55)); }
+
+    .web-col { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 10px; }
+    .web-col-hdr {
+      font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.03em; padding: 6px 10px; border-bottom: 1px solid var(--border);
+      margin-bottom: 2px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .web-card {
+      background: rgba(15, 20, 30, 0.94); border: 1px solid var(--border);
+      border-left: 4px solid var(--blue); border-radius: 8px;
+      padding: 10px 13px; cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s, opacity 0.2s, box-shadow 0.15s;
+    }
+    .web-card:hover, .web-card.lit {
+      border-color: rgba(255,255,255,0.42);
+      transform: translateY(-1px);
+      box-shadow: 0 8px 22px rgba(0,0,0,0.45);
+    }
+    .web-card.selected {
+      border-color: #fff;
+      box-shadow: 0 0 0 2px rgba(255,106,38,0.6), 0 10px 26px rgba(255,46,46,0.22);
+    }
+    .web-card.dim { opacity: 0.24; }
+    .web-card-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 3px; }
+    .web-card-sub { font-size: 10.5px; color: var(--muted); }
+    .web-card-title { font-size: 13px; font-weight: 700; color: #fff; line-height: 1.35; }
+    .web-card-meta { font-size: 11px; color: var(--dim); margin-top: 3px; display: flex; justify-content: space-between; gap: 6px; }
 
     .graph-legend {
-      position: absolute; bottom: 14px; left: 16px; z-index: 14;
-      background: rgba(11, 14, 21, 0.88); backdrop-filter: blur(10px);
-      border: 1px solid var(--border); border-radius: 8px; padding: 8px 13px;
+      position: fixed; bottom: 12px; left: 16px; z-index: 14;
+      background: rgba(11, 14, 21, 0.9); backdrop-filter: blur(10px);
+      border: 1px solid var(--border); border-radius: 8px; padding: 7px 13px;
       display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: var(--muted);
     }
     .leg-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; }
@@ -282,12 +330,24 @@
           <button class="fpill" data-group="pillars">🏛️ 4 เสาหลัก &amp; AI Hub</button>
         </div>
         <div style="display:flex; gap:6px; align-items:center;">
-          <select class="sel-filter" id="layout-select" style="padding:5px 9px; font-size:11.5px;">
+          <select class="sel-filter" id="web-mode-select" style="padding:5px 9px; font-size:11.5px; border-color:var(--blue); color:#7dd3fc;">
+            <option value="structured">🗺️ ผังจัดระเบียบ 3 คอลัมน์ (อ่านง่าย)</option>
+            <option value="force">🕸️ กราฟใยแมงมุมอิสระ (Force)</option>
+          </select>
+          <select class="sel-filter" id="layout-select" style="padding:5px 9px; font-size:11.5px; display:none;">
             <option value="cose">เลย์เอาต์: ใยแมงมุม (Force)</option>
             <option value="concentric">เลย์เอาต์: วงแหวนศูนย์กลาง</option>
             <option value="breadthfirst">เลย์เอาต์: ลำดับชั้น (Tree)</option>
           </select>
-          <button class="btn-link" id="btn-fit" style="padding:5px 10px; font-size:11.5px;">รีเซ็ตซูม</button>
+          <button class="btn-link" id="btn-fit" style="padding:5px 10px; font-size:11.5px;">รีเซ็ตมุมมอง</button>
+        </div>
+      </div>
+      <div class="web-board active" id="web-board">
+        <div class="web-stage" id="web-stage">
+          <svg id="web-svg"></svg>
+          <div class="web-col" id="web-col-1"></div>
+          <div class="web-col" id="web-col-2"></div>
+          <div class="web-col" id="web-col-3"></div>
         </div>
       </div>
       <div id="cy"></div>
@@ -1082,8 +1142,11 @@
       btn.classList.add('active');
       const target = document.getElementById('view-' + btn.dataset.tab);
       target.classList.add('active');
-      if (btn.dataset.tab === 'graph' && cy) {
-        setTimeout(() => { cy.resize(); cy.fit(undefined, 36); }, 60);
+      if (btn.dataset.tab === 'graph') {
+        setTimeout(() => {
+          drawWebLines();
+          if (cy) { cy.resize(); cy.fit(undefined, 36); }
+        }, 60);
       }
     });
   });
@@ -1184,20 +1247,45 @@
       }
     });
 
-    // Group Filter Pills
+    // Group Filter Pills (applies to both Structured Board and Force Graph)
     document.querySelectorAll('#graph-filters .fpill').forEach(pill => {
       pill.addEventListener('click', () => {
         document.querySelectorAll('#graph-filters .fpill').forEach(p => p.classList.remove('active'));
         pill.classList.add('active');
         const g = pill.dataset.group;
-        cy.elements().removeClass('dimmed highlighted');
-        if (g !== 'all') {
-          const matched = cy.nodes().filter(n => n.data('group') === g || n.id() === 'hub-boss');
-          const hood = matched.closedNeighborhood();
-          cy.elements().not(hood).addClass('dimmed');
-          matched.addClass('highlighted');
+
+        // Structured Board filter
+        if (g === 'all') {
+          resetStructuredHighlight();
+        } else {
+          const matchedIds = new Set(ITEMS.filter(i => i.group === g || i.id === 'hub-boss').map(i => i.id));
+          filterStructuredGroup(matchedIds);
+        }
+
+        // Cytoscape filter
+        if (cy) {
+          cy.elements().removeClass('dimmed highlighted');
+          if (g !== 'all') {
+            const matched = cy.nodes().filter(n => n.data('group') === g || n.id() === 'hub-boss');
+            const hood = matched.closedNeighborhood();
+            cy.elements().not(hood).addClass('dimmed');
+            matched.addClass('highlighted');
+          }
         }
       });
+    });
+
+    // Mode Toggle: Structured 3-Column (default) vs Force Graph
+    document.getElementById('web-mode-select').addEventListener('change', e => {
+      const isForce = e.target.value === 'force';
+      document.getElementById('web-board').classList.toggle('active', !isForce);
+      document.getElementById('cy').classList.toggle('active', isForce);
+      document.getElementById('layout-select').style.display = isForce ? 'inline-block' : 'none';
+      if (isForce && cy) {
+        setTimeout(() => { cy.resize(); cy.fit(undefined, 36); }, 60);
+      } else {
+        setTimeout(drawWebLines, 60);
+      }
     });
 
     // Layout Selector
@@ -1212,12 +1300,165 @@
     });
 
     document.getElementById('btn-fit').addEventListener('click', () => {
-      cy.elements().removeClass('dimmed highlighted');
-      cy.fit(undefined, 36);
+      resetStructuredHighlight();
+      document.querySelectorAll('#graph-filters .fpill').forEach(p => p.classList.remove('active'));
+      document.querySelector('#graph-filters .fpill[data-group="all"]').classList.add('active');
+      if (cy) {
+        cy.elements().removeClass('dimmed highlighted');
+        cy.fit(undefined, 36);
+      }
     });
   }
 
+  // =========================================================================
+  // 3B. STRUCTURED 3-COLUMN SPIDERWEB (EASY-TO-READ DEFAULT)
+  // =========================================================================
+  let selectedWebId = null;
+
+  function getConnectedSet(id) {
+    const set = new Set([id]);
+    const item = ITEMS.find(x => x.id === id);
+    if (item) (item.links || []).forEach(t => set.add(t));
+    ITEMS.forEach(other => {
+      if ((other.links || []).includes(id)) set.add(other.id);
+    });
+    return set;
+  }
+
+  function initStructuredWeb() {
+    const col1Ids = ['hub-boss', 'pillar-ai', 'ai-rules', 'ai-inbox', 'ai-vault', 'ext-dododix', 'ext-bmt', 'ext-dividend'];
+    const col2Ids = ['pillar-av', 'pillar-cctv', 'pillar-docs', 'kllc-3d'];
+    const col3Ids = ITEMS.filter(i => !col1Ids.includes(i.id) && !col2Ids.includes(i.id)).map(i => i.id);
+
+    const renderCol = (elId, title, ids) => {
+      const el = document.getElementById(elId);
+      el.innerHTML = `<div class="web-col-hdr"><span>${title}</span><span>${ids.length}</span></div>` +
+        ids.map(id => {
+          const item = ITEMS.find(x => x.id === id);
+          if (!item) return '';
+          return `
+            <div class="web-card" data-id="${item.id}" style="border-left-color:${item.color};">
+              <div class="web-card-top">
+                <span class="web-card-sub">${item.subcategory}</span>
+                <span class="badge ${item.statusCls}">${item.status}</span>
+              </div>
+              <div class="web-card-title">${item.name}</div>
+              <div class="web-card-meta">
+                <span>${item.type}</span>
+                <span style="color:var(--blue);">ดูรายละเอียด →</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+    };
+
+    renderCol('web-col-1', '1. ศูนย์บัญชาการ · AI & 4 เสาหลัก', col1Ids);
+    renderCol('web-col-2', '2. เสาหลักงาน KLLC & 3D View', col2Ids);
+    renderCol('web-col-3', '3. ไฟล์, SOP, TOR & ฐานข้อมูลจริง', col3Ids);
+
+    document.querySelectorAll('.web-card').forEach(card => {
+      card.addEventListener('mouseenter', () => {
+        if (!selectedWebId) highlightStructuredNode(card.dataset.id, false);
+      });
+      card.addEventListener('mouseleave', () => {
+        if (!selectedWebId) resetStructuredHighlight();
+      });
+      card.addEventListener('click', () => {
+        const id = card.dataset.id;
+        selectedWebId = id;
+        highlightStructuredNode(id, true);
+        openInspector(id);
+      });
+    });
+
+    document.getElementById('web-board').addEventListener('click', e => {
+      if (!e.target.closest('.web-card')) {
+        selectedWebId = null;
+        resetStructuredHighlight();
+      }
+    });
+
+    window.addEventListener('resize', drawWebLines);
+    setTimeout(drawWebLines, 120);
+  }
+
+  function drawWebLines() {
+    const stage = document.getElementById('web-stage');
+    const svg = document.getElementById('web-svg');
+    if (!stage || !svg) return;
+
+    const stageRect = stage.getBoundingClientRect();
+    if (stageRect.width === 0) return;
+    svg.setAttribute('viewBox', `0 0 ${stageRect.width} ${stageRect.height}`);
+
+    const edgeSet = new Set();
+    const paths = [];
+    ITEMS.forEach(item => {
+      (item.links || []).forEach(targetId => {
+        const key = [item.id, targetId].sort().join('--');
+        if (edgeSet.has(key)) return;
+        edgeSet.add(key);
+
+        const elA = stage.querySelector(`.web-card[data-id="${item.id}"]`);
+        const elB = stage.querySelector(`.web-card[data-id="${targetId}"]`);
+        if (!elA || !elB) return;
+
+        const rA = elA.getBoundingClientRect();
+        const rB = elB.getBoundingClientRect();
+        const aLeft = rA.left <= rB.left;
+        const startX = (aLeft ? rA.right : rA.left) - stageRect.left;
+        const startY = (rA.top + rA.height / 2) - stageRect.top;
+        const endX = (aLeft ? rB.left : rB.right) - stageRect.left;
+        const endY = (rB.top + rB.height / 2) - stageRect.top;
+        const dx = Math.abs(endX - startX) * 0.45 + 24;
+        const c1x = aLeft ? startX + dx : startX - dx;
+        const c2x = aLeft ? endX - dx : endX + dx;
+
+        paths.push(`<path class="web-path" data-a="${item.id}" data-b="${targetId}" d="M ${startX} ${startY} C ${c1x} ${startY}, ${c2x} ${endY}, ${endX} ${endY}" />`);
+      });
+    });
+    svg.innerHTML = paths.join('');
+    if (selectedWebId) highlightStructuredNode(selectedWebId, true);
+  }
+
+  function highlightStructuredNode(id, markSelected) {
+    const connected = getConnectedSet(id);
+    document.querySelectorAll('.web-card').forEach(c => {
+      const cid = c.dataset.id;
+      c.classList.toggle('dim', !connected.has(cid));
+      c.classList.toggle('lit', connected.has(cid));
+      c.classList.toggle('selected', markSelected && cid === id);
+    });
+    document.querySelectorAll('#web-svg .web-path').forEach(p => {
+      const hit = p.dataset.a === id || p.dataset.b === id;
+      p.classList.toggle('dim', !hit);
+      p.classList.toggle('lit', hit);
+    });
+  }
+
+  function filterStructuredGroup(matchedIds) {
+    selectedWebId = null;
+    document.querySelectorAll('.web-card').forEach(c => {
+      const hit = matchedIds.has(c.dataset.id);
+      c.classList.toggle('dim', !hit);
+      c.classList.toggle('lit', hit);
+      c.classList.remove('selected');
+    });
+    document.querySelectorAll('#web-svg .web-path').forEach(p => {
+      const hit = matchedIds.has(p.dataset.a) && matchedIds.has(p.dataset.b);
+      p.classList.toggle('dim', !hit);
+      p.classList.toggle('lit', hit);
+    });
+  }
+
+  function resetStructuredHighlight() {
+    selectedWebId = null;
+    document.querySelectorAll('.web-card').forEach(c => c.classList.remove('dim', 'lit', 'selected'));
+    document.querySelectorAll('#web-svg .web-path').forEach(p => p.classList.remove('dim', 'lit'));
+  }
+
   function highlightNode(id) {
+    highlightStructuredNode(id, true);
     if (!cy) return;
     const node = cy.getElementById(id);
     if (!node.length) return;
@@ -1474,6 +1715,7 @@
   });
 
   // Boot
+  initStructuredWeb();
   initGraph();
   renderWorkload();
   initTaxonomy();
