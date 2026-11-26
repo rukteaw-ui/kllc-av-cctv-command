@@ -3,7 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Agentic Coding // Holographic HUD</title>
+  <title>AI Agentic Coding // MediaPipe Hand Tracking Holographic HUD</title>
+  
+  <!-- MediaPipe Hands & Camera Utils -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Space+Grotesk:wght@600;700&display=swap');
 
@@ -40,7 +45,7 @@
       inset: 0;
       pointer-events: none;
       z-index: 50;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%),
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.28) 50%),
                   linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
       background-size: 100% 3px, 6px 100%;
       opacity: 0.75;
@@ -110,7 +115,7 @@
     }
 
     .brand-title {
-      font-size: 14px;
+      font-size: 13px;
       letter-spacing: 2px;
       font-weight: 700;
       color: #fff;
@@ -123,7 +128,7 @@
 
     .sys-stats {
       display: flex;
-      gap: 20px;
+      gap: 14px;
       font-size: 11px;
       color: var(--text-muted);
     }
@@ -157,8 +162,9 @@
       height: 100%;
       object-fit: cover;
       transform: scaleX(-1);
-      opacity: 0.35;
-      filter: contrast(1.2) brightness(0.7) hue-rotate(180deg);
+      opacity: 0.45;
+      filter: contrast(1.25) brightness(0.75);
+      display: none;
     }
 
     #hudCanvas {
@@ -176,15 +182,34 @@
       left: 50%;
       transform: translateX(-50%);
       z-index: 20;
-      background: rgba(4, 8, 14, 0.85);
+      background: rgba(4, 8, 14, 0.88);
       border: 1px solid var(--panel-border-cyan);
-      padding: 6px 16px;
+      padding: 7px 18px;
       border-radius: 20px;
       font-size: 11px;
       color: var(--cyan-bright);
       letter-spacing: 1px;
-      box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.35);
       pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .gesture-badge {
+      position: absolute;
+      top: 18px;
+      left: 20px;
+      z-index: 20;
+      background: rgba(6, 10, 16, 0.85);
+      border: 1px solid var(--amber);
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: var(--amber-bright);
+      font-weight: 700;
+      letter-spacing: 1px;
+      box-shadow: 0 0 12px var(--amber-glow);
     }
 
     /* Left Panel: Mech Agent HUD */
@@ -309,10 +334,6 @@
       transform: translateY(-1px);
     }
 
-    .gesture-btn:active {
-      transform: translateY(0);
-    }
-
     /* Right Panel: Sci-Fi Terminal */
     .terminal-panel {
       border: 1px solid var(--panel-border);
@@ -391,20 +412,6 @@
       color: #a3e635;
       font-weight: 600;
     }
-    .cursor-blink {
-      display: inline-block;
-      width: 8px;
-      height: 14px;
-      background: var(--amber);
-      vertical-align: middle;
-      animation: blink 1s step-end infinite;
-      margin-left: 4px;
-    }
-
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0; }
-    }
 
     /* Footer Toolbar */
     footer {
@@ -421,19 +428,7 @@
     .footer-left {
       display: flex;
       align-items: center;
-      gap: 14px;
-    }
-
-    .toggle-control {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-      color: var(--text-muted);
-      transition: color 0.2s;
-    }
-    .toggle-control:hover {
-      color: #fff;
+      gap: 12px;
     }
 
     .footer-btn {
@@ -456,6 +451,7 @@
     .footer-btn.active {
       background: var(--cyan);
       color: #020408;
+      box-shadow: 0 0 14px var(--cyan-glow);
     }
   </style>
 </head>
@@ -469,12 +465,12 @@
   <header>
     <div class="brand">
       <div class="brand-icon">&lt;/&gt;</div>
-      <div class="brand-title">AI AGENTIC CODING // <span>HOLOGRAPHIC CHOREOGRAPHY</span></div>
+      <div class="brand-title">AI AGENTIC CODING // <span>MEDIAPIPE GESTURE AR</span></div>
     </div>
     <div class="sys-stats">
-      <div class="stat-pill">MODE: <b id="trackingModeDisplay">VIRTUAL / MOUSE</b></div>
+      <div class="stat-pill">SOURCE: <b id="trackingModeDisplay">VIRTUAL / MOUSE</b></div>
       <div class="stat-pill">FPS: <b id="fpsVal">60</b></div>
-      <div class="stat-pill">AGENT LATENCY: <b id="latencyVal">8.4ms</b></div>
+      <div class="stat-pill">MEDIAPIPE: <b id="mpStatus">READY</b></div>
       <div class="stat-pill">CONFIDENCE: <b id="confVal">99.8%</b></div>
     </div>
   </header>
@@ -516,10 +512,15 @@
 
   <!-- Center: Holo-Deck (Hand Tracking + Fiber Glow) -->
   <div class="stage-container">
-    <video id="webcam" autoplay playsinline muted></video>
+    <video id="webcam" playsinline muted></video>
     <canvas id="hudCanvas"></canvas>
+    
+    <div class="gesture-badge" id="gestureBadge">
+      [GESTURE: AWAITING HAND]
+    </div>
+
     <div class="hud-guide-text" id="guideText">
-      🖐️ MOVE MOUSE / TOUCH TO CONTROL HAND &bull; CLICK / PINCH TO TRIGGER AGENT
+      <span>🖐️</span> <span id="guideMsg">CLICK "START MEDIAPIPE WEBCAM" TO TRACK REAL HANDS &bull; OR USE MOUSE / TOUCH</span>
     </div>
   </div>
 
@@ -553,19 +554,20 @@
   <!-- Footer -->
   <footer>
     <div class="footer-left">
-      <button class="footer-btn" id="btnCamToggle">📹 ENABLE WEBCAM</button>
+      <button class="footer-btn" id="btnCamToggle">📹 START MEDIAPIPE WEBCAM</button>
+      <button class="footer-btn" id="btnSkeletonToggle">🦴 SKELETON: ON</button>
       <button class="footer-btn" id="btnAudioToggle">🔊 AUDIO: ON</button>
       <button class="footer-btn" id="btnAutoDemo">⚡ AUTO-CHOREOGRAPHY</button>
     </div>
     <div style="color: var(--text-muted); font-size: 10px;">
-      SYSTEM: KLLC-AGENTIC-CORE // CODECRAFTERS AR CONCEPT REPLICA
+      GESTURES: <b>PINCH</b> = EXECUTE &bull; <b>FIST</b> = COMPACT HEAP &bull; <b>OPEN PALM</b> = SPREAD
     </div>
   </footer>
 </div>
 
 <script>
   /* ==========================================================================
-     1. AUDIO SYNTHESIZER (Web Audio API - Zero External Files)
+     1. AUDIO SYNTHESIZER (Web Audio API)
      ========================================================================== */
   class CyberAudio {
     constructor() {
@@ -604,14 +606,18 @@
       const osc = this.ctx.createOscillator();
       const g = this.ctx.createGain();
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(440, now);
-      osc.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
-      g.gain.setValueAtTime(0.12, now);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(1480, now + 0.11);
+      g.gain.setValueAtTime(0.15, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
       osc.connect(g);
       g.connect(this.ctx.destination);
       osc.start();
-      osc.stop(now + 0.15);
+      osc.stop(now + 0.14);
+    }
+    fistSound() {
+      if (!this.enabled) return;
+      this.beep(220, 0.15, 'sawtooth', 0.1);
     }
     taskDoneSound() {
       if (!this.enabled) return;
@@ -629,6 +635,7 @@
   const heapBar = document.getElementById('heapBar');
   const heapVal = document.getElementById('heapVal');
   const stackBar = document.getElementById('stackBar');
+  const gestureBadge = document.getElementById('gestureBadge');
 
   function addLog(text, type = '') {
     const line = document.createElement('div');
@@ -638,7 +645,11 @@
     termLog.scrollTop = termLog.scrollHeight;
   }
 
+  let isTaskBusy = false;
   function runAgentTask(name, detail = '') {
+    if (isTaskBusy) return;
+    isTaskBusy = true;
+
     audio.pinchSound();
     agentStatus.textContent = 'EXECUTING';
     agentStatus.style.borderColor = 'var(--cyan)';
@@ -658,10 +669,10 @@
         agentStatus.style.borderColor = 'var(--amber)';
         agentStatus.style.color = 'var(--amber-bright)';
 
-        // Update gauges dynamically
         const newHeap = (Math.random() * 2 + 1).toFixed(1);
         heapVal.textContent = `${newHeap}G / 4.0G`;
         heapBar.style.width = `${(newHeap / 4.0) * 100}%`;
+        isTaskBusy = false;
       }
     }, 180);
   }
@@ -680,7 +691,7 @@
   });
 
   /* ==========================================================================
-     3. 3D HOLOGRAPHIC MECH AVATAR (Wireframe Hologram on Canvas)
+     3. 3D HOLOGRAPHIC MECH AVATAR
      ========================================================================== */
   const mechCanvas = document.getElementById('mechCanvas');
   const mctx = mechCanvas.getContext('2d');
@@ -693,36 +704,25 @@
   window.addEventListener('resize', resizeMech);
   resizeMech();
 
-  // Procedural 3D Robot / Mech Wireframe Vertices & Edges
   const mechNodes = [
-    // Head / Visor
     {x: -15, y: -50, z: -10}, {x: 15, y: -50, z: -10}, {x: 15, y: -30, z: -10}, {x: -15, y: -30, z: -10},
     {x: -10, y: -50, z: 10},  {x: 10, y: -50, z: 10},  {x: 10, y: -30, z: 10},  {x: -10, y: -30, z: 10},
-    // Torso / Chest
     {x: -35, y: -25, z: -15}, {x: 35, y: -25, z: -15}, {x: 25, y: 25, z: -15}, {x: -25, y: 25, z: -15},
     {x: -30, y: -25, z: 15},  {x: 30, y: -25, z: 15},  {x: 20, y: 25, z: 15},  {x: -20, y: 25, z: 15},
-    // Shoulders
     {x: -55, y: -20, z: 0},   {x: 55, y: -20, z: 0},
-    // Arms / Elbows
     {x: -60, y: 15, z: -5},   {x: 60, y: 15, z: -5},
-    // Core Reactor Center
     {x: 0, y: 0, z: 0}
   ];
 
   const mechEdges = [
-    // Visor Box
     [0,1], [1,2], [2,3], [3,0],
     [4,5], [5,6], [6,7], [7,4],
     [0,4], [1,5], [2,6], [3,7],
-    // Torso Box
     [8,9], [9,10], [10,11], [11,8],
     [12,13], [13,14], [14,15], [15,12],
     [8,12], [9,13], [10,14], [11,15],
-    // Connect Head to Torso
     [3,8], [2,9],
-    // Shoulder joints
     [8,16], [9,17], [16,18], [17,19],
-    // Core connector
     [20, 8], [20, 9], [20, 10], [20, 11]
   ];
 
@@ -736,12 +736,9 @@
     const cosA = Math.cos(mechAngle);
     const sinA = Math.sin(mechAngle);
 
-    // Project nodes
     const projected = mechNodes.map(n => {
-      // Rotate Y
       const rx = n.x * cosA - n.z * sinA;
       const rz = n.x * sinA + n.z * cosA + 160;
-      // Perspective
       const fov = 200 / rz;
       return {
         x: cx + rx * scale * fov,
@@ -750,7 +747,6 @@
       };
     });
 
-    // Draw Holo Wireframe Edges
     mctx.strokeStyle = '#f59e0b';
     mctx.lineWidth = 1.2;
     mctx.shadowColor = 'rgba(245, 158, 11, 0.8)';
@@ -763,7 +759,6 @@
       mctx.stroke();
     });
 
-    // Draw Core glowing orb
     const core = projected[20];
     mctx.fillStyle = '#22d3ee';
     mctx.shadowColor = '#06b6d4';
@@ -772,7 +767,6 @@
     mctx.arc(core.x, core.y, 4.5, 0, Math.PI * 2);
     mctx.fill();
 
-    // Scanline across mech
     const scanY = (Date.now() / 20) % mechCanvas.height;
     mctx.strokeStyle = 'rgba(34, 211, 238, 0.4)';
     mctx.lineWidth = 2;
@@ -786,12 +780,17 @@
   drawMech();
 
   /* ==========================================================================
-     4. CENTER STAGE: HAND TRACKING & FIBER THREADS ENGINE
+     4. MEDIAPIPE HAND TRACKING & HOLOGRAPHIC RENDER ENGINE
      ========================================================================== */
   const canvas = document.getElementById('hudCanvas');
   const ctx = canvas.getContext('2d');
   const webcam = document.getElementById('webcam');
-  const guideText = document.getElementById('guideText');
+  const trackingModeDisplay = document.getElementById('trackingModeDisplay');
+  const mpStatus = document.getElementById('mpStatus');
+  const guideMsg = document.getElementById('guideMsg');
+  const confVal = document.getElementById('confVal');
+
+  let showSkeleton = true;
 
   function resizeStage() {
     canvas.width = canvas.parentElement.clientWidth;
@@ -800,33 +799,22 @@
   window.addEventListener('resize', resizeStage);
   resizeStage();
 
-  // Hand state (virtual / mouse or camera)
-  let hand = {
-    wrist: { x: 0, y: 0 },
-    fingers: [
-      { name: 'Thumb', x: 0, y: 0, targetX: 0, targetY: 0 },
-      { name: 'Index', x: 0, y: 0, targetX: 0, targetY: 0 },
-      { name: 'Middle', x: 0, y: 0, targetX: 0, targetY: 0 },
-      { name: 'Ring', x: 0, y: 0, targetX: 0, targetY: 0 },
-      { name: 'Pinky', x: 0, y: 0, targetX: 0, targetY: 0 }
-    ],
-    isPinching: false,
-    pinchDist: 100,
-    active: true
-  };
+  // 21 Landmark points (Normalized & Screen Coordinates)
+  let rawLandmarks = null;
+  let isMediaPipeActive = false;
 
+  // Virtual hand fallback
   let mouse = {
     x: canvas.width * 0.5,
     y: canvas.height * 0.45,
     isDown: false
   };
 
-  // Particles that burst from fingertips
   const particles = [];
-  function spawnSparks(x, y, count = 8, color = '#fbbf24') {
+  function spawnSparks(x, y, count = 12, color = '#fbbf24') {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = Math.random() * 4 + 1;
+      const speed = Math.random() * 4.5 + 1.2;
       particles.push({
         x, y,
         vx: Math.cos(angle) * speed,
@@ -840,16 +828,17 @@
 
   // Mouse / Touch handlers for virtual hand
   canvas.addEventListener('mousemove', (e) => {
+    if (isMediaPipeActive) return;
     const rect = canvas.getBoundingClientRect();
     mouse.x = e.clientX - rect.left;
     mouse.y = e.clientY - rect.top;
   });
 
   canvas.addEventListener('mousedown', (e) => {
+    if (isMediaPipeActive) return;
     mouse.isDown = true;
-    audio.pinchSound();
-    runAgentTask('pointer.lift()', 'choreography queue lock');
-    spawnSparks(hand.fingers[1].x, hand.fingers[1].y, 16, '#22d3ee');
+    runAgentTask('mouse.pinch()', 'choreography lock on cursor');
+    spawnSparks(mouse.x - 20, mouse.y - 70, 16, '#22d3ee');
   });
 
   window.addEventListener('mouseup', () => {
@@ -857,6 +846,7 @@
   });
 
   canvas.addEventListener('touchmove', (e) => {
+    if (isMediaPipeActive) return;
     e.preventDefault();
     const touch = e.touches[0];
     const rect = canvas.getBoundingClientRect();
@@ -865,82 +855,212 @@
   }, { passive: false });
 
   canvas.addEventListener('touchstart', (e) => {
+    if (isMediaPipeActive) return;
     mouse.isDown = true;
-    audio.pinchSound();
   });
 
   canvas.addEventListener('touchend', () => {
     mouse.isDown = false;
   });
 
-  // Calculate realistic hand kinematics from control point
-  function updateHandKinematics() {
+  // MediaPipe Hand Connection Map (Bones)
+  const HAND_CONNECTIONS = [
+    [0,1], [1,2], [2,3], [3,4],       // Thumb
+    [0,5], [5,6], [6,7], [7,8],       // Index
+    [5,9], [9,10], [10,11], [11,12],  // Middle
+    [9,13], [13,14], [14,15], [15,16],// Ring
+    [13,17], [17,18], [18,19], [19,20],// Pinky
+    [0,17]                            // Palm base
+  ];
+
+  const FINGERTIP_INDICES = [4, 8, 12, 16, 20];
+  const FINGER_NAMES = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'];
+
+  // Gesture State Tracking
+  let lastGesture = 'IDLE';
+  let wasPinching = false;
+  let wasFist = false;
+
+  function classifyGesture(landmarks) {
+    if (!landmarks || landmarks.length < 21) return 'NONE';
+
+    // Tip 4 (Thumb) and Tip 8 (Index) distance
+    const p4 = landmarks[4];
+    const p8 = landmarks[8];
+    const pinchDist = Math.hypot(p4.x - p8.x, p4.y - p8.y);
+
+    // Tips vs MCP knuckles distance to check curled fingers
+    const wrist = landmarks[0];
+    const isIndexExtended = Math.hypot(p8.x - wrist.x, p8.y - wrist.y) > Math.hypot(landmarks[6].x - wrist.x, landmarks[6].y - wrist.y);
+    const isMiddleExtended = Math.hypot(landmarks[12].x - wrist.x, landmarks[12].y - wrist.y) > Math.hypot(landmarks[10].x - wrist.x, landmarks[10].y - wrist.y);
+    const isRingExtended = Math.hypot(landmarks[16].x - wrist.x, landmarks[16].y - wrist.y) > Math.hypot(landmarks[14].x - wrist.y, landmarks[14].y - wrist.y);
+    const isPinkyExtended = Math.hypot(landmarks[20].x - wrist.x, landmarks[20].y - wrist.y) > Math.hypot(landmarks[18].x - wrist.y, landmarks[18].y - wrist.y);
+
+    // 1. PINCH
+    if (pinchDist < 0.075) {
+      return 'PINCH';
+    }
+
+    // 2. FIST (all 4 main fingers curled down)
+    if (!isIndexExtended && !isMiddleExtended && !isRingExtended && !isPinkyExtended) {
+      return 'FIST';
+    }
+
+    // 3. POINT (only index extended)
+    if (isIndexExtended && !isMiddleExtended && !isRingExtended && !isPinkyExtended) {
+      return 'POINT';
+    }
+
+    // 4. OPEN PALM (all fingers extended)
+    if (isIndexExtended && isMiddleExtended && isRingExtended && isPinkyExtended) {
+      return 'OPEN PALM';
+    }
+
+    return 'HAND TRACKED';
+  }
+
+  // Handle gesture trigger events
+  function handleGestureEvents(gesture, screenPoints) {
+    if (gesture !== lastGesture) {
+      gestureBadge.textContent = `[GESTURE: ${gesture}]`;
+      lastGesture = gesture;
+    }
+
+    if (gesture === 'PINCH' && !wasPinching) {
+      wasPinching = true;
+      audio.pinchSound();
+      runAgentTask('pinch.trigger()', 'MediaPipe landmark [4 & 8] contact detected');
+      const midX = (screenPoints[4].x + screenPoints[8].x) / 2;
+      const midY = (screenPoints[4].y + screenPoints[8].y) / 2;
+      spawnSparks(midX, midY, 20, '#22d3ee');
+    } else if (gesture !== 'PINCH') {
+      wasPinching = false;
+    }
+
+    if (gesture === 'FIST' && !wasFist) {
+      wasFist = true;
+      audio.fistSound();
+      runAgentTask('compact_heap()', 'Fist gesture triggered memory compaction');
+      spawnSparks(screenPoints[0].x, screenPoints[0].y, 16, '#f59e0b');
+    } else if (gesture !== 'FIST') {
+      wasFist = false;
+    }
+  }
+
+  // Generate synthetic hand if MediaPipe is not tracking
+  function getSyntheticLandmarks() {
     const t = Date.now() * 0.002;
     const mx = mouse.x;
     const my = mouse.y;
 
-    // Wrist follows below hand
-    hand.wrist.x = mx + Math.sin(t * 0.5) * 15;
-    hand.wrist.y = canvas.height * 0.92;
+    const pinch = mouse.isDown ? 0.2 : 1.0;
+    const screenPts = {};
 
-    // Finger offsets relative to palm
-    const pinchOffset = mouse.isDown ? 0.2 : 1.0;
+    // Wrist
+    screenPts[0] = { x: mx, y: canvas.height * 0.92 };
 
-    const fingerConfig = [
-      { ox: -65 * pinchOffset, oy: -15, length: 70 }, // Thumb
-      { ox: -30 * pinchOffset, oy: -80, length: 110 }, // Index
-      { ox: 5,   oy: -100, length: 130 },             // Middle
-      { ox: 40,  oy: -85, length: 115 },              // Ring
-      { ox: 75,  oy: -55, length: 85 }                // Pinky
+    const offsets = [
+      { ox: -65 * pinch, oy: -15 },  // 4 Thumb
+      { ox: -30 * pinch, oy: -80 },  // 8 Index
+      { ox: 5,   oy: -100 },         // 12 Middle
+      { ox: 40,  oy: -85 },          // 16 Ring
+      { ox: 75,  oy: -55 }           // 20 Pinky
     ];
 
-    fingerConfig.forEach((cfg, idx) => {
-      const f = hand.fingers[idx];
-      // subtle idle breathing wave
-      const wave = Math.sin(t + idx * 0.7) * 4;
-      const targetX = mx + cfg.ox + wave;
-      const targetY = my + cfg.oy + (wave * 0.5);
-
-      // Smooth interpolation
-      f.x += (targetX - f.x) * 0.35;
-      f.y += (targetY - f.y) * 0.35;
+    FINGERTIP_INDICES.forEach((tipIdx, i) => {
+      const cfg = offsets[i];
+      const wave = Math.sin(t + i * 0.7) * 4;
+      screenPts[tipIdx] = {
+        x: mx + cfg.ox + wave,
+        y: my + cfg.oy + (wave * 0.5)
+      };
     });
 
-    // Check pinch distance (Thumb vs Index)
-    const dx = hand.fingers[0].x - hand.fingers[1].x;
-    const dy = hand.fingers[0].y - hand.fingers[1].y;
-    hand.pinchDist = Math.hypot(dx, dy);
-    hand.isPinching = mouse.isDown || hand.pinchDist < 30;
+    return {
+      screenPoints: screenPts,
+      gesture: mouse.isDown ? 'PINCH' : 'OPEN PALM',
+      wrist: screenPts[0]
+    };
   }
 
-  // Draw Sci-Fi HUD on canvas
+  // Draw Sci-Fi HUD Frame
   function renderHUD() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    updateHandKinematics();
-
     const t = Date.now() * 0.003;
 
-    // 1. Draw glowing fiber cables (energy threads) from wrist to fingertips
-    hand.fingers.forEach((finger, i) => {
-      const wx = hand.wrist.x + (i - 2) * 18;
-      const wy = hand.wrist.y;
-      const fx = finger.x;
-      const fy = finger.y;
+    let screenPoints = {};
+    let currentGesture = 'IDLE';
+    let wrist = { x: canvas.width / 2, y: canvas.height * 0.9 };
 
-      // Draw multiple fiber strands for volumetric fiber-optic cable look
+    if (isMediaPipeActive && rawLandmarks && rawLandmarks.length === 21) {
+      // Map MediaPipe 0..1 to mirrored screen coords
+      rawLandmarks.forEach((lm, idx) => {
+        screenPoints[idx] = {
+          x: (1 - lm.x) * canvas.width,
+          y: lm.y * canvas.height
+        };
+      });
+      wrist = screenPoints[0];
+      currentGesture = classifyGesture(rawLandmarks);
+      handleGestureEvents(currentGesture, screenPoints);
+    } else {
+      const synth = getSyntheticLandmarks();
+      screenPoints = synth.screenPoints;
+      currentGesture = synth.gesture;
+      wrist = synth.wrist;
+      if (mouse.isDown) {
+        gestureBadge.textContent = '[GESTURE: PINCH (VIRTUAL)]';
+      } else {
+        gestureBadge.textContent = '[GESTURE: MOUSE TRACKED]';
+      }
+    }
+
+    // 1. Draw Skeleton Bones if enabled
+    if (showSkeleton && isMediaPipeActive && rawLandmarks) {
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(6, 182, 212, 0.4)';
+      ctx.lineWidth = 1.5;
+      HAND_CONNECTIONS.forEach(([a, b]) => {
+        if (screenPoints[a] && screenPoints[b]) {
+          ctx.moveTo(screenPoints[a].x, screenPoints[a].y);
+          ctx.lineTo(screenPoints[b].x, screenPoints[b].y);
+        }
+      });
+      ctx.stroke();
+
+      // Knuckle joints
+      for (let i = 0; i < 21; i++) {
+        if (!FINGERTIP_INDICES.includes(i) && screenPoints[i]) {
+          ctx.beginPath();
+          ctx.arc(screenPoints[i].x, screenPoints[i].y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(34, 211, 238, 0.6)';
+          ctx.fill();
+        }
+      }
+    }
+
+    // 2. Draw Holographic Fiber Energy Threads from Wrist to Fingertips
+    FINGERTIP_INDICES.forEach((tipIdx, i) => {
+      const pt = screenPoints[tipIdx];
+      if (!pt) return;
+
+      const wx = wrist.x + (i - 2) * 16;
+      const wy = wrist.y;
+      const fx = pt.x;
+      const fy = pt.y;
+
       const strands = 3;
       for (let s = 0; s < strands; s++) {
         const offset = (s - 1) * 3;
-        const cp1x = wx + (fx - wx) * 0.2 + Math.sin(t + i + s) * 20;
-        const cp1y = wy - (wy - fy) * 0.3;
-        const cp2x = fx + Math.cos(t * 0.8 + i) * 15;
+        const cp1x = wx + (fx - wx) * 0.2 + Math.sin(t + i + s) * 18;
+        const cp1y = wy - (wy - fy) * 0.35;
+        const cp2x = fx + Math.cos(t * 0.8 + i) * 14;
         const cp2y = fy + (wy - fy) * 0.25;
 
         ctx.beginPath();
         ctx.moveTo(wx + offset, wy);
         ctx.bezierCurveTo(cp1x + offset, cp1y, cp2x + offset, cp2y, fx, fy);
 
-        // Gradient for threads
         const grad = ctx.createLinearGradient(wx, wy, fx, fy);
         grad.addColorStop(0, 'rgba(245, 158, 11, 0.15)');
         grad.addColorStop(0.7, 'rgba(251, 191, 36, 0.85)');
@@ -954,73 +1074,71 @@
       }
     });
 
-    // 2. Connecting webbing / choreography matrix between fingers
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(6, 182, 212, 0.25)';
-    ctx.lineWidth = 1;
-    ctx.shadowBlur = 0;
-    for (let i = 0; i < hand.fingers.length - 1; i++) {
-      ctx.moveTo(hand.fingers[i].x, hand.fingers[i].y);
-      ctx.lineTo(hand.fingers[i + 1].x, hand.fingers[i + 1].y);
-    }
-    ctx.stroke();
+    // 3. Fingertip Glowing Spheres & HUD Reticles
+    FINGERTIP_INDICES.forEach((tipIdx, i) => {
+      const pt = screenPoints[tipIdx];
+      if (!pt) return;
 
-    // 3. Fingertip Nodes (Glowing White/Amber Spheres + Reticles)
-    hand.fingers.forEach((finger, i) => {
-      const isIndex = i === 1;
-      const isThumb = i === 0;
+      const isIndex = tipIdx === 8;
+      const isThumb = tipIdx === 4;
+      const isPinchActive = currentGesture === 'PINCH';
 
-      // Node ring
+      // Ring
       ctx.beginPath();
-      ctx.arc(finger.x, finger.y, 10, 0, Math.PI * 2);
-      ctx.strokeStyle = isIndex && hand.isPinching ? '#22d3ee' : '#f59e0b';
-      ctx.lineWidth = 1.5;
+      ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2);
+      ctx.strokeStyle = (isIndex || isThumb) && isPinchActive ? '#22d3ee' : '#f59e0b';
+      ctx.lineWidth = 1.6;
       ctx.shadowColor = ctx.strokeStyle;
       ctx.shadowBlur = 10;
       ctx.stroke();
 
-      // Core bright dot
+      // Glowing dot
       ctx.beginPath();
-      ctx.arc(finger.x, finger.y, 4.5, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
       ctx.shadowBlur = 15;
       ctx.fill();
 
-      // Crosshair tick marks
+      // Crosshairs
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
       ctx.lineWidth = 1;
       ctx.shadowBlur = 0;
       ctx.beginPath();
-      ctx.moveTo(finger.x - 14, finger.y); ctx.lineTo(finger.x - 8, finger.y);
-      ctx.moveTo(finger.x + 8, finger.y); ctx.lineTo(finger.x + 14, finger.y);
-      ctx.moveTo(finger.x, finger.y - 14); ctx.lineTo(finger.x, finger.y - 8);
-      ctx.moveTo(finger.x, finger.y + 8); ctx.lineTo(finger.x, finger.y + 14);
+      ctx.moveTo(pt.x - 14, pt.y); ctx.lineTo(pt.x - 8, pt.y);
+      ctx.moveTo(pt.x + 8, pt.y); ctx.lineTo(pt.x + 14, pt.y);
+      ctx.moveTo(pt.x, pt.y - 14); ctx.lineTo(pt.x, pt.y - 8);
+      ctx.moveTo(pt.x, pt.y + 8); ctx.lineTo(pt.x, pt.y + 14);
       ctx.stroke();
 
-      // Coordinates text overlay
-      ctx.fillStyle = 'rgba(251, 191, 36, 0.7)';
+      // Label
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.75)';
       ctx.font = '9px "JetBrains Mono"';
-      ctx.fillText(`${finger.name.toUpperCase()} [${Math.round(finger.x)}, ${Math.round(finger.y)}]`, finger.x + 14, finger.y - 6);
+      ctx.fillText(`${FINGER_NAMES[i].toUpperCase()} [${Math.round(pt.x)}, ${Math.round(pt.y)}]`, pt.x + 14, pt.y - 6);
     });
 
-    // 4. Pinch Proximity Arc (Thumb to Index)
-    if (hand.pinchDist < 120) {
-      const midX = (hand.fingers[0].x + hand.fingers[1].x) / 2;
-      const midY = (hand.fingers[0].y + hand.fingers[1].y) / 2;
+    // 4. Pinch Proximity Line (Thumb to Index)
+    if (screenPoints[4] && screenPoints[8]) {
+      const p4 = screenPoints[4];
+      const p8 = screenPoints[8];
+      const pDist = Math.hypot(p4.x - p8.x, p4.y - p8.y);
 
-      ctx.beginPath();
-      ctx.moveTo(hand.fingers[0].x, hand.fingers[0].y);
-      ctx.lineTo(hand.fingers[1].x, hand.fingers[1].y);
-      ctx.strokeStyle = hand.isPinching ? '#22d3ee' : 'rgba(245, 158, 11, 0.6)';
-      ctx.lineWidth = hand.isPinching ? 3 : 1.5;
-      ctx.shadowColor = hand.isPinching ? '#06b6d4' : '#f59e0b';
-      ctx.shadowBlur = 12;
-      ctx.stroke();
+      if (pDist < 140) {
+        const midX = (p4.x + p8.x) / 2;
+        const midY = (p4.y + p8.y) / 2;
 
-      // Pinch indicator badge
-      ctx.fillStyle = hand.isPinching ? '#22d3ee' : '#f59e0b';
-      ctx.font = '10px "JetBrains Mono"';
-      ctx.fillText(hand.isPinching ? '[PINCH TRIGGERED]' : `PINCH: ${Math.round(hand.pinchDist)}px`, midX + 10, midY - 10);
+        ctx.beginPath();
+        ctx.moveTo(p4.x, p4.y);
+        ctx.lineTo(p8.x, p8.y);
+        ctx.strokeStyle = currentGesture === 'PINCH' ? '#22d3ee' : 'rgba(245, 158, 11, 0.6)';
+        ctx.lineWidth = currentGesture === 'PINCH' ? 3 : 1.5;
+        ctx.shadowColor = currentGesture === 'PINCH' ? '#06b6d4' : '#f59e0b';
+        ctx.shadowBlur = 12;
+        ctx.stroke();
+
+        ctx.fillStyle = currentGesture === 'PINCH' ? '#22d3ee' : '#f59e0b';
+        ctx.font = '10px "JetBrains Mono"';
+        ctx.fillText(currentGesture === 'PINCH' ? '⚡ [PINCH TRIGGERED]' : `PINCH: ${Math.round(pDist)}px`, midX + 10, midY - 10);
+      }
     }
 
     // 5. Render Particle Sparks
@@ -1028,7 +1146,7 @@
       const p = particles[i];
       p.x += p.vx;
       p.y += p.vy;
-      p.alpha -= 0.03;
+      p.alpha -= 0.035;
       if (p.alpha <= 0) {
         particles.splice(i, 1);
         continue;
@@ -1043,72 +1161,111 @@
     }
     ctx.globalAlpha = 1.0;
 
-    // 6. Sci-Fi Floating HUD Grid / Target Frame
-    const boxW = 280;
-    const boxH = 220;
-    const boxX = mouse.x - boxW / 2;
-    const boxY = mouse.y - boxH / 2 - 30;
-
-    ctx.strokeStyle = 'rgba(6, 182, 212, 0.2)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(boxX, boxY, boxW, boxH);
-
-    // Corner brackets
-    const cLen = 14;
-    ctx.strokeStyle = '#22d3ee';
-    ctx.lineWidth = 2;
-    // Top-Left
-    ctx.beginPath(); ctx.moveTo(boxX, boxY + cLen); ctx.lineTo(boxX, boxY); ctx.lineTo(boxX + cLen, boxY); ctx.stroke();
-    // Top-Right
-    ctx.beginPath(); ctx.moveTo(boxX + boxW - cLen, boxY); ctx.lineTo(boxX + boxW); ctx.lineTo(boxX + boxW, boxY + cLen); ctx.stroke();
-    // Bottom-Left
-    ctx.beginPath(); ctx.moveTo(boxX, boxY + boxH - cLen); ctx.lineTo(boxX, boxY + boxH); ctx.lineTo(boxX + cLen, boxY + boxH); ctx.stroke();
-    // Bottom-Right
-    ctx.beginPath(); ctx.moveTo(boxX + boxW - cLen, boxY + boxH); ctx.lineTo(boxX + boxW); ctx.lineTo(boxX + boxW, boxY + boxH - cLen); ctx.stroke();
-
     requestAnimationFrame(renderHUD);
   }
   renderHUD();
 
   /* ==========================================================================
-     5. CONTROLS & WEBCAM INTEGRATION
+     5. MEDIAPIPE INITIALIZATION & CAMERA ENGINE
      ========================================================================== */
   const btnCamToggle = document.getElementById('btnCamToggle');
+  const btnSkeletonToggle = document.getElementById('btnSkeletonToggle');
   const btnAudioToggle = document.getElementById('btnAudioToggle');
   const btnAutoDemo = document.getElementById('btnAutoDemo');
-  const trackingModeDisplay = document.getElementById('trackingModeDisplay');
 
-  let webcamActive = false;
+  let mpHands = null;
+  let mpCamera = null;
+
+  async function initMediaPipe() {
+    mpStatus.textContent = 'LOADING...';
+    try {
+      mpHands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+      });
+
+      mpHands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.65,
+        minTrackingConfidence: 0.65
+      });
+
+      mpHands.onResults((results) => {
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+          rawLandmarks = results.multiHandLandmarks[0];
+          const conf = (98.5 + Math.random() * 1.4).toFixed(1);
+          confVal.textContent = `${conf}%`;
+        } else {
+          rawLandmarks = null;
+        }
+      });
+
+      mpStatus.textContent = 'ONLINE';
+      addLog('> MediaPipe Hands neural model initialized', 'ok');
+      return true;
+    } catch (err) {
+      console.error('Failed to initialize MediaPipe:', err);
+      mpStatus.textContent = 'OFFLINE';
+      addLog('! MediaPipe failed to load, fallback to virtual mode', 'cmd');
+      return false;
+    }
+  }
+
   btnCamToggle.addEventListener('click', async () => {
-    if (!webcamActive) {
+    if (!isMediaPipeActive) {
+      btnCamToggle.textContent = '⏳ STARTING...';
+      const loaded = await initMediaPipe();
+      if (!loaded) {
+        alert('Could not initialize MediaPipe. Check network connection.');
+        btnCamToggle.textContent = '📹 START MEDIAPIPE WEBCAM';
+        return;
+      }
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 1280, height: 720, facingMode: 'user' }
+        webcam.style.display = 'block';
+        mpCamera = new Camera(webcam, {
+          onFrame: async () => {
+            if (isMediaPipeActive && mpHands) {
+              await mpHands.send({ image: webcam });
+            }
+          },
+          width: 1280,
+          height: 720
         });
-        webcam.srcObject = stream;
-        webcam.play();
-        webcamActive = true;
-        btnCamToggle.textContent = '🛑 STOP WEBCAM';
+
+        await mpCamera.start();
+        isMediaPipeActive = true;
+        btnCamToggle.textContent = '🛑 STOP MEDIAPIPE';
         btnCamToggle.classList.add('active');
-        trackingModeDisplay.textContent = 'WEBCAM + VIRTUAL HUD';
-        guideText.textContent = '📹 WEBCAM ACTIVE &bull; MOUSE/HAND TRACKING ENGAGED';
-        addLog('> video stream attached: 1280x720 30fps', 'ok');
+        trackingModeDisplay.textContent = 'MEDIAPIPE LIVE CAMERA';
+        guideMsg.textContent = '🖐️ RAISE HAND TO CAMERA &bull; PINCH THUMB+INDEX TO TRIGGER';
+        addLog('> live video feed hooked to MediaPipe Hands pipeline', 'ok');
       } catch (err) {
-        console.warn('Webcam access error:', err);
-        addLog('! webcam access denied or unavailable; continuing in virtual mode', 'cmd');
-        alert('Webcam permission was not granted or not available in this environment. Falling back to smooth virtual mouse tracking!');
+        console.warn('Webcam stream error:', err);
+        webcam.style.display = 'none';
+        btnCamToggle.textContent = '📹 START MEDIAPIPE WEBCAM';
+        alert('Camera access denied or unavailable. You can continue using Virtual Mouse mode!');
       }
     } else {
-      if (webcam.srcObject) {
-        webcam.srcObject.getTracks().forEach(track => track.stop());
-        webcam.srcObject = null;
+      if (mpCamera) {
+        await mpCamera.stop();
+        mpCamera = null;
       }
-      webcamActive = false;
-      btnCamToggle.textContent = '📹 ENABLE WEBCAM';
+      webcam.style.display = 'none';
+      isMediaPipeActive = false;
+      rawLandmarks = null;
+      btnCamToggle.textContent = '📹 START MEDIAPIPE WEBCAM';
       btnCamToggle.classList.remove('active');
       trackingModeDisplay.textContent = 'VIRTUAL / MOUSE';
-      guideText.textContent = '🖐️ MOVE MOUSE / TOUCH TO CONTROL HAND • CLICK / PINCH TO TRIGGER AGENT';
+      guideMsg.textContent = 'CLICK "START MEDIAPIPE WEBCAM" TO TRACK REAL HANDS • OR USE MOUSE / TOUCH';
+      addLog('> MediaPipe tracking suspended, back to virtual mode', 'cmd');
     }
+  });
+
+  btnSkeletonToggle.addEventListener('click', () => {
+    showSkeleton = !showSkeleton;
+    btnSkeletonToggle.textContent = `🦴 SKELETON: ${showSkeleton ? 'ON' : 'OFF'}`;
+    btnSkeletonToggle.classList.toggle('active', showSkeleton);
   });
 
   btnAudioToggle.addEventListener('click', () => {
@@ -1135,7 +1292,7 @@
       autoDemoInterval = setInterval(() => {
         const tasks = [
           () => runAgentTask('string_solver', 'optimizing ast tokens'),
-          () => runAgentTask('memory.compact()', '1.8G heap compacted in 1.2s'),
+          () => runAgentTask('compact_heap()', '1.8G heap compacted in 1.2s'),
           () => runAgentTask('gesture_compiler', 'hand tracked agent C03NJU7S'),
           () => runAgentTask('choreography.step()', 'IDEA 12: puppets that dream when idle')
         ];
@@ -1151,13 +1308,20 @@
     }
   });
 
-  // Random stat fluctuations for realism
-  setInterval(() => {
-    const lat = (Math.random() * 2 + 7.5).toFixed(1);
-    document.getElementById('latencyVal').textContent = `${lat}ms`;
-    const conf = (99.4 + Math.random() * 0.5).toFixed(1);
-    document.getElementById('confVal').textContent = `${conf}%`;
-  }, 2000);
+  // Dynamic FPS & Telemetry
+  let frameCount = 0;
+  let lastTime = performance.now();
+  function updateFPS() {
+    frameCount++;
+    const now = performance.now();
+    if (now - lastTime >= 1000) {
+      document.getElementById('fpsVal').textContent = frameCount;
+      frameCount = 0;
+      lastTime = now;
+    }
+    requestAnimationFrame(updateFPS);
+  }
+  updateFPS();
 </script>
 
 </body>
