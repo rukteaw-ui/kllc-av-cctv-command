@@ -3,216 +3,81 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Agentic Coding // MediaPipe Hand Tracking Holographic HUD</title>
+  <title>CodeCrafters // AI Agentic Coding Full AR Experience</title>
   
   <!-- MediaPipe Hands & Camera Utils -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Space+Grotesk:wght@600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Space+Grotesk:wght@600;700;800&display=swap');
 
     :root {
-      --bg: #030508;
-      --amber: #f59e0b;
-      --amber-bright: #fbbf24;
-      --amber-glow: rgba(245, 158, 11, 0.45);
-      --cyan: #06b6d4;
-      --cyan-bright: #22d3ee;
-      --cyan-glow: rgba(6, 182, 212, 0.4);
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
-      --panel-bg: rgba(6, 10, 16, 0.82);
-      --panel-border: rgba(245, 158, 11, 0.35);
-      --panel-border-cyan: rgba(34, 211, 238, 0.35);
+      --amber: #ff9900;
+      --amber-bright: #ffb733;
+      --amber-glow: rgba(255, 153, 0, 0.55);
+      --cyan: #00e5ff;
+      --cyan-bright: #33eeff;
+      --cyan-glow: rgba(0, 229, 255, 0.5);
+      --term-bg: rgba(14, 10, 4, 0.78);
+      --term-border: rgba(255, 153, 0, 0.45);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: 'JetBrains Mono', monospace;
-      overflow: hidden;
+    html, body {
       width: 100vw;
       height: 100vh;
+      overflow: hidden;
+      background-color: #05070a;
+      font-family: 'JetBrains Mono', monospace;
+      color: #fff;
       user-select: none;
     }
 
-    /* Sci-Fi Grid Backdrop & Scanlines */
-    .crt-overlay {
+    /* FULL-SCREEN PASSTHROUGH AR VIEWPORT */
+    #ar-viewport {
       position: fixed;
       inset: 0;
-      pointer-events: none;
-      z-index: 50;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.28) 50%),
-                  linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
-      background-size: 100% 3px, 6px 100%;
-      opacity: 0.75;
-    }
-
-    .vignette {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 40;
-      background: radial-gradient(circle at center, transparent 40%, rgba(2, 4, 8, 0.88) 100%);
-    }
-
-    /* Main Container */
-    #app {
-      position: relative;
       width: 100%;
       height: 100%;
-      display: grid;
-      grid-template-columns: 340px 1fr 400px;
-      grid-template-rows: 64px 1fr 60px;
-      gap: 12px;
-      padding: 12px;
-    }
-
-    /* Header */
-    header {
-      grid-column: 1 / -1;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border: 1px solid var(--panel-border);
-      background: var(--panel-bg);
-      padding: 0 20px;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 0 20px rgba(245, 158, 11, 0.1);
-      position: relative;
-    }
-
-    header::before, header::after {
-      content: '';
-      position: absolute;
-      width: 6px;
-      height: 6px;
-      background: var(--amber);
-    }
-    header::before { top: -1px; left: -1px; }
-    header::after { bottom: -1px; right: -1px; }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .brand-icon {
-      width: 32px;
-      height: 32px;
-      border: 2px solid var(--amber);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--amber);
-      font-weight: 800;
-      box-shadow: 0 0 12px var(--amber-glow);
-    }
-
-    .brand-title {
-      font-size: 13px;
-      letter-spacing: 2px;
-      font-weight: 700;
-      color: #fff;
-    }
-
-    .brand-title span {
-      color: var(--cyan);
-      text-shadow: 0 0 10px var(--cyan-glow);
-    }
-
-    .sys-stats {
-      display: flex;
-      gap: 14px;
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-
-    .stat-pill {
-      background: rgba(245, 158, 11, 0.08);
-      border: 1px solid rgba(245, 158, 11, 0.25);
-      padding: 4px 10px;
-      border-radius: 4px;
-    }
-    .stat-pill b {
-      color: var(--amber-bright);
-    }
-
-    /* Center Stage (Canvas & Video) */
-    .stage-container {
-      position: relative;
-      border: 1px solid var(--panel-border-cyan);
-      background: #020408;
-      border-radius: 4px;
       overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: inset 0 0 40px rgba(6, 182, 212, 0.1);
+      background: #06090e;
     }
 
+    /* WEBCAM BACKGROUND (100% Fullscreen) */
     #webcam {
       position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
-      object-fit: contain;
-      transform: scaleX(-1);
-      opacity: 0.5;
-      filter: contrast(1.25) brightness(0.75);
-      display: none;
-      transition: transform 0.15s ease-out, object-fit 0.2s ease;
-    }
-
-    #webcam.fit-cover {
       object-fit: cover;
+      transform: scaleX(-1);
+      filter: contrast(1.15) brightness(0.85) saturate(0.9);
+      display: block;
+      z-index: 1;
     }
 
-    .zoom-toolbar {
+    /* FALLBACK SIMULATED ROOM WHEN WEBCAM IS OFF */
+    .room-fallback {
       position: absolute;
-      top: 18px;
-      right: 20px;
-      z-index: 25;
+      inset: 0;
+      z-index: 1;
+      background: radial-gradient(circle at 50% 45%, #182030 0%, #0d121c 55%, #05070a 100%);
       display: flex;
       align-items: center;
-      gap: 6px;
-      background: rgba(6, 10, 16, 0.88);
-      border: 1px solid var(--panel-border-cyan);
-      border-radius: 4px;
-      padding: 4px 8px;
-      box-shadow: 0 0 14px rgba(6, 182, 212, 0.3);
+      justify-content: center;
+      opacity: 1;
+      transition: opacity 0.4s ease;
     }
 
-    .zoom-btn {
-      background: rgba(6, 182, 212, 0.15);
-      border: 1px solid var(--panel-border-cyan);
-      color: var(--cyan-bright);
-      padding: 3px 8px;
-      border-radius: 3px;
-      font-family: inherit;
-      font-size: 11px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .zoom-btn:hover {
-      background: rgba(6, 182, 212, 0.35);
-      box-shadow: 0 0 8px var(--cyan-glow);
+    .room-fallback.hidden {
+      opacity: 0;
+      pointer-events: none;
     }
 
-    .zoom-readout {
-      font-size: 11px;
-      font-weight: 700;
-      color: #fff;
-      min-width: 44px;
-      text-align: center;
-    }
-
-    #hudCanvas {
+    /* MAIN AR HUD CANVAS (Draws 3D Mech, Hand Fibers, Sparks & Reticles) */
+    #arCanvas {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -221,402 +86,312 @@
       cursor: crosshair;
     }
 
-    .hud-guide-text {
+    /* SUBTLE SCANLINE OVERLAY */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 40;
+      background: linear-gradient(rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                  linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+      background-size: 100% 3px, 6px 100%;
+      opacity: 0.65;
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 35;
+      background: radial-gradient(circle at center, transparent 45%, rgba(0, 0, 0, 0.75) 100%);
+    }
+
+    /* ========================================================================
+       TOP HEADER (Exact replica of CodeCrafters video)
+       ======================================================================== */
+    .top-header {
       position: absolute;
-      bottom: 20px;
+      top: 24px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 20;
-      background: rgba(4, 8, 14, 0.88);
-      border: 1px solid var(--panel-border-cyan);
-      padding: 7px 18px;
-      border-radius: 20px;
-      font-size: 11px;
-      color: var(--cyan-bright);
-      letter-spacing: 1px;
-      box-shadow: 0 0 15px rgba(6, 182, 212, 0.35);
+      z-index: 25;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
       pointer-events: none;
+    }
+
+    .brand-row {
       display: flex;
       align-items: center;
-      gap: 8px;
-    }
-
-    .gesture-badge {
-      position: absolute;
-      top: 18px;
-      left: 20px;
-      z-index: 20;
-      background: rgba(6, 10, 16, 0.85);
-      border: 1px solid var(--amber);
-      padding: 6px 14px;
-      border-radius: 4px;
-      font-size: 11px;
-      color: var(--amber-bright);
-      font-weight: 700;
-      letter-spacing: 1px;
-      box-shadow: 0 0 12px var(--amber-glow);
-    }
-
-    /* Left Panel: Mech Agent HUD */
-    .agent-panel {
-      border: 1px solid var(--panel-border);
-      background: var(--panel-bg);
-      backdrop-filter: blur(8px);
-      display: flex;
-      flex-direction: column;
-      padding: 16px;
-      gap: 14px;
-      position: relative;
-    }
-
-    .panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px dashed rgba(245, 158, 11, 0.3);
-      padding-bottom: 8px;
-    }
-
-    .agent-badge {
-      font-size: 12px;
-      font-weight: 800;
-      color: var(--amber-bright);
-      text-shadow: 0 0 8px var(--amber-glow);
-      letter-spacing: 1.5px;
-    }
-
-    .status-tag {
-      font-size: 10px;
-      padding: 2px 6px;
-      background: rgba(245, 158, 11, 0.15);
-      border: 1px solid var(--amber);
-      color: var(--amber-bright);
-      border-radius: 3px;
-      animation: pulseGlow 2s infinite ease-in-out;
-    }
-
-    @keyframes pulseGlow {
-      0%, 100% { opacity: 0.8; box-shadow: 0 0 4px var(--amber-glow); }
-      50% { opacity: 1; box-shadow: 0 0 12px var(--amber-glow); }
-    }
-
-    .mech-viewport {
-      width: 100%;
-      height: 220px;
-      background: radial-gradient(circle, rgba(245, 158, 11, 0.08) 0%, transparent 70%);
-      border: 1px solid rgba(245, 158, 11, 0.2);
-      border-radius: 4px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    #mechCanvas {
-      width: 100%;
-      height: 100%;
-    }
-
-    .agent-telemetry {
-      display: flex;
-      flex-direction: column;
       gap: 10px;
-      font-size: 11px;
     }
 
-    .bar-group {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .bar-label {
-      display: flex;
-      justify-content: space-between;
-      color: var(--text-muted);
-    }
-
-    .bar-bg {
-      width: 100%;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-
-    .bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--amber), var(--amber-bright));
-      width: 65%;
-      box-shadow: 0 0 8px var(--amber-glow);
-      transition: width 0.3s ease;
-    }
-
-    .gesture-triggers {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+    .codecrafters-badge {
+      display: inline-flex;
+      align-items: center;
       gap: 8px;
-      margin-top: auto;
-    }
-
-    .gesture-btn {
-      background: rgba(245, 158, 11, 0.08);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-      color: var(--amber-bright);
-      padding: 8px 6px;
-      border-radius: 4px;
-      font-family: inherit;
-      font-size: 10px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 19px;
       font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      color: #ffffff;
+      letter-spacing: -0.2px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
     }
 
-    .gesture-btn:hover {
-      background: rgba(245, 158, 11, 0.25);
-      border-color: var(--amber-bright);
-      box-shadow: 0 0 10px var(--amber-glow);
-      transform: translateY(-1px);
-    }
-
-    /* Right Panel: Sci-Fi Terminal */
-    .terminal-panel {
-      border: 1px solid var(--panel-border);
-      background: var(--panel-bg);
-      backdrop-filter: blur(8px);
-      display: flex;
-      flex-direction: column;
-      padding: 14px;
-      position: relative;
-    }
-
-    .term-titlebar {
+    .cc-logo {
+      width: 32px;
+      height: 32px;
+      background: #111;
+      border: 2px solid var(--amber);
+      border-radius: 50%;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid rgba(245, 158, 11, 0.3);
-      padding-bottom: 8px;
-      margin-bottom: 10px;
-      font-size: 11px;
+      justify-content: center;
       color: var(--amber);
-      font-weight: 700;
-      letter-spacing: 1px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      font-size: 13px;
+      box-shadow: 0 0 14px var(--amber-glow);
     }
 
-    .term-dots {
+    .hero-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 26px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+      text-shadow: 0 3px 12px rgba(0, 0, 0, 0.9);
+    }
+
+    .hero-title span {
+      color: var(--cyan);
+      text-shadow: 0 0 18px var(--cyan-glow);
+    }
+
+    /* ========================================================================
+       RIGHT FLOATING HOLOGRAPHIC TERMINAL
+       ======================================================================== */
+    .ar-terminal {
+      position: absolute;
+      top: 140px;
+      right: 36px;
+      width: 440px;
+      height: 480px;
+      background: var(--term-bg);
+      border: 1px solid var(--term-border);
+      border-radius: 4px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 25px rgba(255, 153, 0, 0.2), inset 0 0 15px rgba(255, 153, 0, 0.05);
+      z-index: 25;
       display: flex;
-      gap: 4px;
+      flex-direction: column;
+      padding: 14px 16px;
+      font-size: 12px;
+      line-height: 1.65;
     }
 
-    .term-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      border: 1px solid var(--amber);
+    .ar-terminal::before, .ar-terminal::after {
+      content: '';
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-color: var(--amber);
+      pointer-events: none;
+    }
+    .ar-terminal::before { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+    .ar-terminal::after { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+
+    .term-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px dashed rgba(255, 153, 0, 0.3);
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: var(--amber-bright);
     }
 
-    .term-log {
+    .term-body {
       flex: 1;
       overflow-y: auto;
-      font-size: 11.5px;
-      line-height: 1.6;
-      color: rgba(255, 235, 190, 0.9);
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      padding-right: 4px;
+      gap: 3px;
+      color: #ffe6b3;
     }
 
-    .term-log::-webkit-scrollbar {
+    .term-body::-webkit-scrollbar {
       width: 4px;
     }
-    .term-log::-webkit-scrollbar-thumb {
-      background: rgba(245, 158, 11, 0.4);
+    .term-body::-webkit-scrollbar-thumb {
+      background: rgba(255, 153, 0, 0.4);
       border-radius: 2px;
     }
 
-    .log-line {
-      word-break: break-all;
-    }
-    .log-line.cmd {
-      color: #38bdf8;
-      font-weight: 700;
-    }
-    .log-line.ok {
-      color: #4ade80;
-    }
-    .log-line.idea {
-      color: #fbbf24;
-      font-weight: 700;
-      margin-top: 6px;
-    }
-    .log-line.lifting {
-      color: #cbd5e1;
-    }
-    .log-line.done {
-      color: #a3e635;
-      font-weight: 600;
-    }
+    .t-cmd { color: #38bdf8; font-weight: 700; }
+    .t-ok { color: #4ade80; }
+    .t-idea { color: #fbbf24; font-weight: 700; margin-top: 6px; }
+    .t-lift { color: #cbd5e1; }
+    .t-done { color: #a3e635; font-weight: 600; }
 
-    /* Footer Toolbar */
-    footer {
-      grid-column: 1 / -1;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border: 1px solid var(--panel-border-cyan);
-      background: var(--panel-bg);
-      padding: 0 16px;
-      font-size: 11px;
-    }
-
-    .footer-left {
+    /* ========================================================================
+       FLOATING CONTROLS & BOTTOM DOCK
+       ======================================================================== */
+    .ar-bottom-dock {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
       display: flex;
       align-items: center;
       gap: 12px;
+      background: rgba(8, 12, 18, 0.85);
+      border: 1px solid rgba(255, 153, 0, 0.35);
+      border-radius: 30px;
+      padding: 6px 18px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 15px rgba(255, 153, 0, 0.2);
     }
 
-    .footer-btn {
-      background: rgba(6, 182, 212, 0.12);
-      border: 1px solid var(--panel-border-cyan);
-      color: var(--cyan-bright);
+    .dock-btn {
+      background: rgba(255, 153, 0, 0.12);
+      border: 1px solid rgba(255, 153, 0, 0.4);
+      color: var(--amber-bright);
       padding: 6px 14px;
-      border-radius: 4px;
+      border-radius: 20px;
       font-family: inherit;
       font-size: 11px;
       font-weight: 700;
       cursor: pointer;
       transition: all 0.2s;
+      letter-spacing: 0.5px;
+    }
+
+    .dock-btn:hover {
+      background: rgba(255, 153, 0, 0.3);
+      box-shadow: 0 0 12px var(--amber-glow);
+      transform: translateY(-1px);
+    }
+
+    .dock-btn.active {
+      background: var(--amber);
+      color: #000;
+      box-shadow: 0 0 16px var(--amber-glow);
+    }
+
+    /* GESTURE HINT BANNER */
+    .ar-hint {
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 25;
+      font-size: 12px;
+      color: var(--cyan-bright);
+      background: rgba(4, 10, 18, 0.8);
+      border: 1px solid var(--cyan-glow);
+      padding: 5px 16px;
+      border-radius: 16px;
       letter-spacing: 1px;
+      text-shadow: 0 0 8px var(--cyan-glow);
+      pointer-events: none;
     }
-    .footer-btn:hover {
-      background: rgba(6, 182, 212, 0.25);
-      box-shadow: 0 0 12px var(--cyan-glow);
+
+    /* SUBTITLE REPLICA AT BOTTOM */
+    .bottom-subtitle {
+      position: absolute;
+      bottom: 8px;
+      left: 36px;
+      z-index: 25;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.85);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+      pointer-events: none;
     }
-    .footer-btn.active {
-      background: var(--cyan);
-      color: #020408;
-      box-shadow: 0 0 14px var(--cyan-glow);
+    .bottom-subtitle b {
+      color: #fff;
     }
   </style>
 </head>
 <body>
 
-<div class="crt-overlay"></div>
+<div class="scanlines"></div>
 <div class="vignette"></div>
 
-<div id="app">
-  <!-- Header -->
-  <header>
-    <div class="brand">
-      <div class="brand-icon">&lt;/&gt;</div>
-      <div class="brand-title">AI AGENTIC CODING // <span>MEDIAPIPE GESTURE AR</span></div>
-    </div>
-    <div class="sys-stats">
-      <div class="stat-pill">SOURCE: <b id="trackingModeDisplay">VIRTUAL / MOUSE</b></div>
-      <div class="stat-pill">FPS: <b id="fpsVal">60</b></div>
-      <div class="stat-pill">MEDIAPIPE: <b id="mpStatus">READY</b></div>
-      <div class="stat-pill">CONFIDENCE: <b id="confVal">99.8%</b></div>
-    </div>
-  </header>
+<div id="ar-viewport">
+  <!-- 1. FULLSCREEN WEBCAM FEED -->
+  <video id="webcam" playsinline muted></video>
 
-  <!-- Left: Mech Agent HUD -->
-  <div class="agent-panel">
-    <div class="panel-header">
-      <div class="agent-badge">AGENT: C03NJU7S</div>
-      <div class="status-tag" id="agentStatus">IDLE</div>
-    </div>
-
-    <!-- 3D Holographic Mech Canvas -->
-    <div class="mech-viewport">
-      <canvas id="mechCanvas"></canvas>
-    </div>
-
-    <div class="agent-telemetry">
-      <div class="bar-group">
-        <div class="bar-label"><span>HEAP COMPACTION</span><span id="heapVal">1.8G / 4.0G</span></div>
-        <div class="bar-bg"><div class="bar-fill" id="heapBar" style="width: 45%;"></div></div>
-      </div>
-      <div class="bar-group">
-        <div class="bar-label"><span>CHOREOGRAPHY STACK</span><span id="stackVal">12 THREADS</span></div>
-        <div class="bar-bg"><div class="bar-fill" id="stackBar" style="width: 75%; background: linear-gradient(90deg, var(--cyan), var(--cyan-bright));"></div></div>
-      </div>
-      <div class="bar-group">
-        <div class="bar-label"><span>MEMORY STORE SYNC</span><span id="memVal">960B (100%)</span></div>
-        <div class="bar-bg"><div class="bar-fill" id="memBar" style="width: 100%;"></div></div>
-      </div>
-    </div>
-
-    <div class="gesture-triggers">
-      <button class="gesture-btn" id="btnChoreograph">1. Choreograph</button>
-      <button class="gesture-btn" id="btnCompact">2. Compact Heap</button>
-      <button class="gesture-btn" id="btnTrain">3. Train Epoch</button>
-      <button class="gesture-btn" id="btnDream">4. Idle Dream</button>
+  <!-- Fallback if camera not yet active -->
+  <div class="room-fallback" id="roomFallback">
+    <div style="text-align: center; color: var(--text-muted); font-size: 13px;">
+      <div style="font-size: 40px; margin-bottom: 12px; filter: drop-shadow(0 0 12px var(--cyan));">📹</div>
+      <div style="color: #fff; font-size: 16px; font-weight: 700; margin-bottom: 6px;">AR PASSTHROUGH READY</div>
+      <div style="color: var(--cyan); letter-spacing: 1px;">PRESS "START CAMERA" BELOW TO ENTER FULL-SCREEN AR</div>
     </div>
   </div>
 
-  <!-- Center: Holo-Deck (Hand Tracking + Fiber Glow) -->
-  <div class="stage-container">
-    <video id="webcam" playsinline muted></video>
-    <canvas id="hudCanvas"></canvas>
-    
-    <div class="gesture-badge" id="gestureBadge">
-      [GESTURE: AWAITING HAND]
-    </div>
+  <!-- 2. FULL-SCREEN AR CANVAS (Draws 3D Robot, Glowing Fingertip Fibers, Sparks & HUD) -->
+  <canvas id="arCanvas"></canvas>
 
-    <!-- Zoom & Aspect Ratio Controls -->
-    <div class="zoom-toolbar">
-      <button class="zoom-btn" id="btnZoomOut" title="ซูมออก (ถอยออกมา)">🔍 -</button>
-      <span class="zoom-readout" id="zoomReadout">100%</span>
-      <button class="zoom-btn" id="btnZoomIn" title="ซูมเข้า">🔍 +</button>
-      <button class="zoom-btn" id="btnFitToggle" title="สลับโหมด พอดีจอ (FIT) / เต็มจอ (FILL)">🔲 FIT</button>
-      <button class="zoom-btn" id="btnZoomReset" title="รีเซ็ตกลับ 100% (Reset)">🔄 100%</button>
+  <!-- 3. TOP HEADER (Exact CodeCrafters Replica) -->
+  <div class="top-header">
+    <div class="brand-row">
+      <div class="cc-logo">&lt;/&gt;</div>
+      <div class="codecrafters-badge">@CodeCrafters</div>
     </div>
+    <div class="hero-title">This Is What AI <span>Agentic Coding</span> Looks Like</div>
+  </div>
 
-    <div class="hud-guide-text" id="guideText">
-      <span>🖐️</span> <span id="guideMsg">CLICK "START MEDIAPIPE WEBCAM" TO TRACK REAL HANDS &bull; SCROLL TO ZOOM IN/OUT</span>
+  <!-- 4. RIGHT FLOATING HOLOGRAPHIC TERMINAL -->
+  <div class="ar-terminal">
+    <div class="term-header">
+      <span>agent --watch</span>
+      <span>[status: awaiting instruction]</span>
+    </div>
+    <div class="term-body" id="termLog">
+      <div class="t-cmd">&gt; agent --watch</div>
+      <div class="t-ok">[ok] hand tracked agent C03NJU7S</div>
+      <div class="t-lift">status: idle (awaiting instruction)</div>
+      <div class="t-idea">IDEA 11: task queue as choreography</div>
+      <div>running world_indexer</div>
+      <div>running string_solver</div>
+      <div class="t-ok">running gesture_compiler****** ok</div>
+      <div class="t-idea">IDEA 12: puppets that dream when idle</div>
+      <div class="t-lift">lifting: migrate memory store (960B)</div>
+      <div class="t-lift">**</div>
+      <div class="t-done">done : 960B in 2.3s</div>
+      <div class="t-lift">lifting: compact heap (1.8G)</div>
+      <div class="t-done">done : 1.8G in 1.5s</div>
+      <div class="t-lift">lifting: train epoch 12/48 (512 batches)</div>
+      <div class="t-lift">*******</div>
+      <div class="t-done">done : 512 batches in 5.2s</div>
     </div>
   </div>
 
-  <!-- Right: Sci-Fi Terminal HUD -->
-  <div class="terminal-panel">
-    <div class="term-titlebar">
-      <span>agent --watch (live choreography)</span>
-      <div class="term-dots">
-        <div class="term-dot"></div>
-        <div class="term-dot"></div>
-      </div>
-    </div>
-    <div class="term-log" id="termLog">
-      <div class="log-line cmd">&gt; agent --watch</div>
-      <div class="log-line ok">[ok] hand tracked agent C03NJU7S</div>
-      <div class="log-line lifting">status: idle (awaiting instruction)</div>
-      <div class="log-line idea">IDEA 11: task queue as choreography</div>
-      <div class="log-line">running world_indexer</div>
-      <div class="log-line">running string_solver</div>
-      <div class="log-line ok">running gesture_compiler****** ok</div>
-      <div class="log-line idea">IDEA 12: puppets that dream when idle</div>
-      <div class="log-line lifting">lifting: migrate memory store (960B)</div>
-      <div class="log-line done">done : 960B in 2.3s</div>
-      <div class="log-line lifting">lifting: compact heap (1.8G)</div>
-      <div class="log-line done">done : 1.8G in 1.5s</div>
-      <div class="log-line lifting">lifting: train epoch 12/48 (512 batches)</div>
-      <div class="log-line done">done : 512 batches in 5.2s</div>
-    </div>
+  <!-- 5. GESTURE STATUS BANNER -->
+  <div class="ar-hint" id="gestureHint">
+    🖐️ RAISE HAND TO CAMERA &bull; PINCH THUMB+INDEX TO TRIGGER TASK
   </div>
 
-  <!-- Footer -->
-  <footer>
-    <div class="footer-left">
-      <button class="footer-btn" id="btnCamToggle">📹 START MEDIAPIPE WEBCAM</button>
-      <button class="footer-btn" id="btnSkeletonToggle">🦴 SKELETON: ON</button>
-      <button class="footer-btn" id="btnAudioToggle">🔊 AUDIO: ON</button>
-      <button class="footer-btn" id="btnAutoDemo">⚡ AUTO-CHOREOGRAPHY</button>
-    </div>
-    <div style="color: var(--text-muted); font-size: 10px;">
-      GESTURES: <b>PINCH</b> = EXECUTE &bull; <b>FIST</b> = COMPACT HEAP &bull; <b>OPEN PALM</b> = SPREAD
-    </div>
-  </footer>
+  <!-- 6. BOTTOM SUBTITLE -->
+  <div class="bottom-subtitle">
+    de anymore... but watching AI <b>agentic choreography</b>
+  </div>
+
+  <!-- 7. BOTTOM DOCK CONTROLS -->
+  <div class="ar-bottom-dock">
+    <button class="dock-btn" id="btnCamera">📹 START CAMERA</button>
+    <button class="dock-btn" id="btnAudio">🔊 AUDIO: ON</button>
+    <button class="dock-btn" id="btnAutoDemo">⚡ AUTO-CHOREOGRAPHY</button>
+    <button class="dock-btn" id="btnFullscreen">🔲 FULLSCREEN</button>
+  </div>
 </div>
 
 <script>
@@ -637,21 +412,6 @@
         this.ctx.resume();
       }
     }
-    beep(freq = 880, duration = 0.08, type = 'sine', gain = 0.1) {
-      if (!this.enabled) return;
-      this.init();
-      if (!this.ctx) return;
-      const osc = this.ctx.createOscillator();
-      const g = this.ctx.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-      g.gain.setValueAtTime(gain, this.ctx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
-      osc.connect(g);
-      g.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(this.ctx.currentTime + duration);
-    }
     pinchSound() {
       if (!this.enabled) return;
       this.init();
@@ -660,23 +420,29 @@
       const osc = this.ctx.createOscillator();
       const g = this.ctx.createGain();
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(520, now);
-      osc.frequency.exponentialRampToValueAtTime(1480, now + 0.11);
-      g.gain.setValueAtTime(0.15, now);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+      osc.frequency.setValueAtTime(540, now);
+      osc.frequency.exponentialRampToValueAtTime(1580, now + 0.12);
+      g.gain.setValueAtTime(0.14, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
       osc.connect(g);
       g.connect(this.ctx.destination);
       osc.start();
-      osc.stop(now + 0.14);
-    }
-    fistSound() {
-      if (!this.enabled) return;
-      this.beep(220, 0.15, 'sawtooth', 0.1);
+      osc.stop(now + 0.15);
     }
     taskDoneSound() {
       if (!this.enabled) return;
-      this.beep(587, 0.06, 'sine', 0.08);
-      setTimeout(() => this.beep(880, 0.1, 'sine', 0.1), 60);
+      this.init();
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, this.ctx.currentTime);
+      g.gain.setValueAtTime(0.1, this.ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.18);
+      osc.connect(g);
+      g.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.18);
     }
   }
   const audio = new CyberAudio();
@@ -685,701 +451,422 @@
      2. TERMINAL LOG SYSTEM
      ========================================================================== */
   const termLog = document.getElementById('termLog');
-  const agentStatus = document.getElementById('agentStatus');
-  const heapBar = document.getElementById('heapBar');
-  const heapVal = document.getElementById('heapVal');
-  const stackBar = document.getElementById('stackBar');
-  const gestureBadge = document.getElementById('gestureBadge');
-
   function addLog(text, type = '') {
     const line = document.createElement('div');
-    line.className = `log-line ${type}`;
+    line.className = type;
     line.textContent = text;
     termLog.appendChild(line);
     termLog.scrollTop = termLog.scrollHeight;
   }
 
-  let isTaskBusy = false;
-  function runAgentTask(name, detail = '') {
-    if (isTaskBusy) return;
-    isTaskBusy = true;
-
+  let isExecuting = false;
+  function triggerAgentChoreography(actionName, detail = '') {
+    if (isExecuting) return;
+    isExecuting = true;
     audio.pinchSound();
-    agentStatus.textContent = 'EXECUTING';
-    agentStatus.style.borderColor = 'var(--cyan)';
-    agentStatus.style.color = 'var(--cyan-bright)';
 
-    addLog(`> trigger [gesture]: ${name}`, 'cmd');
-    if (detail) addLog(`lifting: ${detail}`, 'lifting');
+    addLog(`> trigger [gesture]: ${actionName}`, 't-cmd');
+    if (detail) addLog(`lifting: ${detail}`, 't-lift');
 
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 25;
-      if (progress >= 100) {
-        clearInterval(interval);
-        addLog(`done : ${name} executed successfully`, 'done');
-        audio.taskDoneSound();
-        agentStatus.textContent = 'IDLE';
-        agentStatus.style.borderColor = 'var(--amber)';
-        agentStatus.style.color = 'var(--amber-bright)';
-
-        const newHeap = (Math.random() * 2 + 1).toFixed(1);
-        heapVal.textContent = `${newHeap}G / 4.0G`;
-        heapBar.style.width = `${(newHeap / 4.0) * 100}%`;
-        isTaskBusy = false;
-      }
-    }, 180);
+    setTimeout(() => {
+      addLog(`done : ${actionName} finished in 1.4s`, 't-done');
+      audio.taskDoneSound();
+      isExecuting = false;
+    }, 1200);
   }
-
-  document.getElementById('btnChoreograph').addEventListener('click', () => {
-    runAgentTask('choreography.expand()', 're-allocating agent sub-trees');
-  });
-  document.getElementById('btnCompact').addEventListener('click', () => {
-    runAgentTask('compact_heap()', 'reclaiming unused pointer cells (1.8G)');
-  });
-  document.getElementById('btnTrain').addEventListener('click', () => {
-    runAgentTask('train_epoch()', 'running epoch 13/48 (512 batches)');
-  });
-  document.getElementById('btnDream').addEventListener('click', () => {
-    runAgentTask('idle_dream()', 'dreaming state vector synthesis in memory store');
-  });
 
   /* ==========================================================================
-     3. 3D HOLOGRAPHIC MECH PUPPET AVATAR (Interactive Robotics Engine)
+     3. AR CANVAS RESIZING & KINEMATICS
      ========================================================================== */
-  const mechCanvas = document.getElementById('mechCanvas');
-  const mctx = mechCanvas.getContext('2d');
-
-  function resizeMech() {
-    mechCanvas.width = mechCanvas.clientWidth * window.devicePixelRatio;
-    mechCanvas.height = mechCanvas.clientHeight * window.devicePixelRatio;
-  }
-  window.addEventListener('resize', resizeMech);
-  resizeMech();
-
-  // Puppet Tracking State
-  const puppetState = {
-    targetYaw: 0,
-    targetPitch: 0,
-    yaw: 0,
-    pitch: 0,
-    armLift: 0,
-    targetArmLift: 0,
-    isPinching: false,
-    isFist: false,
-    handDetected: false,
-    pulseEnergy: 0,
-    dreamTimer: 0
-  };
-
-  // 3D Point Projection Helper
-  function project3D(x, y, z, yaw, pitch, scale, cx, cy) {
-    const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
-    const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
-
-    // Rotate Y (Yaw)
-    const x1 = x * cosY - z * sinY;
-    const z1 = x * sinY + z * cosY;
-
-    // Rotate X (Pitch)
-    const y2 = y * cosP - z1 * sinP;
-    const z2 = y * sinP + z1 * cosP + 170;
-
-    const fov = 220 / z2;
-    return {
-      x: cx + x1 * scale * fov,
-      y: cy + y2 * scale * fov,
-      z: z2
-    };
-  }
-
-  // Draw 3D Shaded Polygon Face
-  function drawMechFace(pts, fillColor, strokeColor, lineWidth = 1) {
-    if (pts.length < 3) return;
-    mctx.beginPath();
-    mctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) {
-      mctx.lineTo(pts[i].x, pts[i].y);
-    }
-    mctx.closePath();
-    if (fillColor) {
-      mctx.fillStyle = fillColor;
-      mctx.fill();
-    }
-    if (strokeColor) {
-      mctx.strokeStyle = strokeColor;
-      mctx.lineWidth = lineWidth;
-      mctx.stroke();
-    }
-  }
-
-  function drawMech() {
-    mctx.clearRect(0, 0, mechCanvas.width, mechCanvas.height);
-    const cx = mechCanvas.width / 2;
-    const cy = mechCanvas.height / 2 + 15;
-    const scale = 1.35 * (mechCanvas.width / 320);
-    const now = performance.now() * 0.001;
-
-    // Smooth Damping to Target Hand/Mouse Movement
-    const damp = 0.12;
-    if (puppetState.handDetected) {
-      puppetState.yaw += (puppetState.targetYaw - puppetState.yaw) * damp;
-      puppetState.pitch += (puppetState.targetPitch - puppetState.pitch) * damp;
-      puppetState.armLift += (puppetState.targetArmLift - puppetState.armLift) * damp;
-      puppetState.dreamTimer = 0;
-    } else {
-      // Idle Dreaming Mode (breathing, curious looking around)
-      puppetState.dreamTimer += 0.016;
-      puppetState.yaw += (Math.sin(now * 0.7) * 0.35 - puppetState.yaw) * 0.05;
-      puppetState.pitch += (Math.sin(now * 1.1) * 0.15 - puppetState.pitch) * 0.05;
-      puppetState.armLift += (0 - puppetState.armLift) * 0.05;
-    }
-
-    if (puppetState.pulseEnergy > 0) {
-      puppetState.pulseEnergy = Math.max(0, puppetState.pulseEnergy - 0.04);
-    }
-
-    const yaw = puppetState.yaw;
-    const pitch = puppetState.pitch;
-    const breath = Math.sin(now * 2.5) * 2;
-    const armLift = puppetState.armLift;
-
-    // 1. Holographic Floor Pedestal Rings
-    mctx.save();
-    for (let r = 1; r <= 2; r++) {
-      const radius = r * 38;
-      const rotRing = now * (r === 1 ? 0.8 : -0.5);
-      mctx.beginPath();
-      for (let a = 0; a <= Math.PI * 2; a += 0.2) {
-        const p = project3D(Math.cos(a + rotRing) * radius, 65, Math.sin(a + rotRing) * radius, yaw * 0.2, pitch * 0.2, scale, cx, cy);
-        if (a === 0) mctx.moveTo(p.x, p.y);
-        else mctx.lineTo(p.x, p.y);
-      }
-      mctx.closePath();
-      mctx.strokeStyle = r === 1 ? 'rgba(245, 158, 11, 0.4)' : 'rgba(34, 211, 238, 0.35)';
-      mctx.lineWidth = 1;
-      mctx.stroke();
-    }
-    mctx.restore();
-
-    // 2. Torso / Chest Armor Geometry
-    const torsoY = 0 + breath * 0.5;
-    const tBox = [
-      [-26, torsoY - 26, -14], [26, torsoY - 26, -14], [20, torsoY + 22, -12], [-20, torsoY + 22, -12],
-      [-24, torsoY - 26, 14],  [24, torsoY - 26, 14],  [18, torsoY + 22, 12],  [-18, torsoY + 22, 12]
-    ].map(pt => project3D(pt[0], pt[1], pt[2], yaw * 0.7, pitch * 0.6, scale, cx, cy));
-
-    const armorFill = puppetState.isPinching ? 'rgba(6, 182, 212, 0.25)' : 'rgba(245, 158, 11, 0.16)';
-    const armorStroke = puppetState.isPinching ? '#22d3ee' : '#f59e0b';
-
-    // Front Chest
-    drawMechFace([tBox[0], tBox[1], tBox[2], tBox[3]], armorFill, armorStroke, 1.4);
-    // Left Flank
-    drawMechFace([tBox[0], tBox[3], tBox[7], tBox[4]], 'rgba(245, 158, 11, 0.08)', armorStroke, 1);
-    // Right Flank
-    drawMechFace([tBox[1], tBox[2], tBox[6], tBox[5]], 'rgba(245, 158, 11, 0.08)', armorStroke, 1);
-
-    // 3. Glowing Arc Reactor Core (Center of Chest)
-    const corePos = project3D(0, torsoY, -14, yaw * 0.7, pitch * 0.6, scale, cx, cy);
-    const coreGlow = puppetState.pulseEnergy > 0 ? 16 + puppetState.pulseEnergy * 14 : 10;
-    mctx.beginPath();
-    mctx.arc(corePos.x, corePos.y, 6 + puppetState.pulseEnergy * 3, 0, Math.PI * 2);
-    mctx.fillStyle = puppetState.isPinching ? '#ffffff' : '#22d3ee';
-    mctx.shadowColor = '#06b6d4';
-    mctx.shadowBlur = coreGlow;
-    mctx.fill();
-
-    mctx.beginPath();
-    mctx.arc(corePos.x, corePos.y, 11, 0, Math.PI * 2);
-    mctx.strokeStyle = 'rgba(34, 211, 238, 0.7)';
-    mctx.lineWidth = 1.2;
-    mctx.stroke();
-
-    // 4. Head & Helmet (Yaw & Pitch follows hand actively)
-    const headYaw = yaw * 1.1;
-    const headPitch = pitch * 1.1;
-    const headCenterY = torsoY - 42;
-
-    const hNodes = [
-      [-16, headCenterY - 14, -13], [16, headCenterY - 14, -13], [14, headCenterY + 8, -12], [-14, headCenterY + 8, -12],
-      [-14, headCenterY - 14, 12],  [14, headCenterY - 14, 12],  [12, headCenterY + 8, 11],  [-12, headCenterY + 8, 11],
-      [-22, headCenterY - 24, 0],   [22, headCenterY - 24, 0],
-      [0, headCenterY - 2, -14]
-    ].map(pt => project3D(pt[0], pt[1], pt[2], headYaw, headPitch, scale, cx, cy));
-
-    drawMechFace([hNodes[0], hNodes[1], hNodes[2], hNodes[3]], 'rgba(245, 158, 11, 0.22)', armorStroke, 1.4);
-    drawMechFace([hNodes[0], hNodes[3], hNodes[7], hNodes[4]], 'rgba(245, 158, 11, 0.1)', armorStroke, 1);
-    drawMechFace([hNodes[1], hNodes[2], hNodes[6], hNodes[5]], 'rgba(245, 158, 11, 0.1)', armorStroke, 1);
-
-    // Antennae Rods
-    mctx.beginPath();
-    mctx.moveTo(hNodes[0].x, hNodes[0].y); mctx.lineTo(hNodes[8].x, hNodes[8].y);
-    mctx.moveTo(hNodes[1].x, hNodes[1].y); mctx.lineTo(hNodes[9].x, hNodes[9].y);
-    mctx.strokeStyle = '#22d3ee';
-    mctx.lineWidth = 1.8;
-    mctx.stroke();
-
-    // Glowing Cyber Visor
-    const visorP1 = project3D(-11, headCenterY - 2, -13.5, headYaw, headPitch, scale, cx, cy);
-    const visorP2 = project3D(11, headCenterY - 2, -13.5, headYaw, headPitch, scale, cx, cy);
-    mctx.beginPath();
-    mctx.moveTo(visorP1.x, visorP1.y);
-    mctx.lineTo(visorP2.x, visorP2.y);
-    mctx.strokeStyle = puppetState.isPinching ? '#ffffff' : '#22d3ee';
-    mctx.lineWidth = 3.5;
-    mctx.shadowColor = '#06b6d4';
-    mctx.shadowBlur = 12;
-    mctx.stroke();
-
-    // 5. Articulated Left Arm
-    const lShoulder = project3D(-34, torsoY - 20, 0, yaw * 0.7, pitch * 0.6, scale, cx, cy);
-    const lElbow = project3D(-42, torsoY + 8, -8, yaw * 0.7, pitch * 0.6, scale, cx, cy);
-    const lHand = project3D(puppetState.isFist ? -25 : -36, torsoY + 30, puppetState.isFist ? -16 : 0, yaw * 0.7, pitch * 0.6, scale, cx, cy);
-
-    mctx.beginPath();
-    mctx.moveTo(lShoulder.x, lShoulder.y);
-    mctx.lineTo(lElbow.x, lElbow.y);
-    mctx.lineTo(lHand.x, lHand.y);
-    mctx.strokeStyle = armorStroke;
-    mctx.lineWidth = 3;
-    mctx.shadowBlur = 4;
-    mctx.stroke();
-
-    // 6. Articulated Right Arm (Reacts dynamically to user hand)
-    const rShoulder = project3D(34, torsoY - 20, 0, yaw * 0.7, pitch * 0.6, scale, cx, cy);
-    const rElbowY = torsoY + 10 - armLift * 30;
-    const rElbowZ = -10 - armLift * 15;
-    const rHandY = torsoY + 28 - armLift * 55;
-    const rHandZ = -8 - armLift * 35;
-    const rHandX = puppetState.isFist ? 22 : (36 + (puppetState.isPinching ? -10 : 0));
-
-    const rElbow = project3D(42, rElbowY, rElbowZ, yaw * 0.8, pitch * 0.7, scale, cx, cy);
-    const rHand = project3D(rHandX, rHandY, rHandZ, yaw * 0.9, pitch * 0.8, scale, cx, cy);
-
-    mctx.beginPath();
-    mctx.moveTo(rShoulder.x, rShoulder.y);
-    mctx.lineTo(rElbow.x, rElbow.y);
-    mctx.lineTo(rHand.x, rHand.y);
-    mctx.strokeStyle = puppetState.isPinching ? '#22d3ee' : '#fbbf24';
-    mctx.lineWidth = puppetState.isPinching ? 4 : 3;
-    mctx.shadowColor = mctx.strokeStyle;
-    mctx.shadowBlur = puppetState.isPinching ? 14 : 6;
-    mctx.stroke();
-
-    // Hand Claw
-    mctx.beginPath();
-    mctx.arc(rHand.x, rHand.y, puppetState.isPinching ? 6 : (puppetState.isFist ? 5 : 7), 0, Math.PI * 2);
-    mctx.fillStyle = puppetState.isPinching ? '#22d3ee' : '#fbbf24';
-    mctx.fill();
-
-    // 7. Telemetry Overlay inside Mech Box
-    mctx.save();
-    mctx.font = '9px "JetBrains Mono"';
-    mctx.fillStyle = puppetState.handDetected ? '#22d3ee' : '#f59e0b';
-    mctx.fillText(puppetState.handDetected ? '● PUPPET LINK: ACTIVE' : '○ PUPPET: IDLE DREAMING', 10, 18);
-    mctx.fillStyle = '#94a3b8';
-    mctx.fillText(`POSE: ${puppetState.isPinching ? 'PINCH LOCK' : (puppetState.isFist ? 'DEFENSE GUARD' : (puppetState.handDetected ? 'TRACKING' : 'IDLE'))}`, 10, 32);
-    mctx.restore();
-
-    // 8. Holographic Laser Scanline
-    const scanY = (Date.now() / 18) % mechCanvas.height;
-    mctx.strokeStyle = puppetState.isPinching ? 'rgba(34, 211, 238, 0.55)' : 'rgba(245, 158, 11, 0.4)';
-    mctx.lineWidth = 1.8;
-    mctx.beginPath();
-    mctx.moveTo(0, scanY);
-    mctx.lineTo(mechCanvas.width, scanY);
-    mctx.stroke();
-
-    requestAnimationFrame(drawMech);
-  }
-  drawMech();
-
-  /* ==========================================================================
-     4. MEDIAPIPE HAND TRACKING & HOLOGRAPHIC RENDER ENGINE
-     ========================================================================== */
-  const canvas = document.getElementById('hudCanvas');
+  const canvas = document.getElementById('arCanvas');
   const ctx = canvas.getContext('2d');
   const webcam = document.getElementById('webcam');
-  const trackingModeDisplay = document.getElementById('trackingModeDisplay');
-  const mpStatus = document.getElementById('mpStatus');
-  const guideMsg = document.getElementById('guideMsg');
-  const confVal = document.getElementById('confVal');
+  const roomFallback = document.getElementById('roomFallback');
+  const gestureHint = document.getElementById('gestureHint');
 
-  let showSkeleton = true;
-
-  function resizeStage() {
-    canvas.width = canvas.parentElement.clientWidth;
-    canvas.height = canvas.parentElement.clientHeight;
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
   }
-  window.addEventListener('resize', resizeStage);
-  resizeStage();
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
 
-  // 21 Landmark points (Normalized & Screen Coordinates)
+  // Hand landmarks storage (Real MediaPipe or Virtual Mouse fallback)
   let rawLandmarks = null;
   let isMediaPipeActive = false;
 
-  // Virtual hand fallback
   let mouse = {
-    x: canvas.width * 0.5,
-    y: canvas.height * 0.45,
+    x: window.innerWidth * 0.48,
+    y: window.innerHeight * 0.48,
     isDown: false
   };
 
-  const particles = [];
-  function spawnSparks(x, y, count = 12, color = '#fbbf24') {
-    for (let i = 0; i < count; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = Math.random() * 4.5 + 1.2;
-      particles.push({
-        x, y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        alpha: 1,
-        color,
-        size: Math.random() * 2.5 + 1
-      });
-    }
-  }
-
-  // Mouse / Touch handlers for virtual hand
   canvas.addEventListener('mousemove', (e) => {
     if (isMediaPipeActive) return;
-    const rect = canvas.getBoundingClientRect();
-    mouse.x = e.clientX - rect.left;
-    mouse.y = e.clientY - rect.top;
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
   });
 
-  canvas.addEventListener('mousedown', (e) => {
+  canvas.addEventListener('mousedown', () => {
     if (isMediaPipeActive) return;
     mouse.isDown = true;
-    runAgentTask('mouse.pinch()', 'choreography lock on cursor');
-    spawnSparks(mouse.x - 20, mouse.y - 70, 16, '#22d3ee');
+    triggerAgentChoreography('gesture.pinch()', 'locking choreography queue');
+    spawnSparks(mouse.x - 25, mouse.y - 70, 20, '#00e5ff');
   });
 
   window.addEventListener('mouseup', () => {
     mouse.isDown = false;
   });
 
+  // Touch Support
   canvas.addEventListener('touchmove', (e) => {
     if (isMediaPipeActive) return;
     e.preventDefault();
     const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    mouse.x = touch.clientX - rect.left;
-    mouse.y = touch.clientY - rect.top;
+    mouse.x = touch.clientX;
+    mouse.y = touch.clientY;
   }, { passive: false });
 
-  canvas.addEventListener('touchstart', (e) => {
+  canvas.addEventListener('touchstart', () => {
     if (isMediaPipeActive) return;
     mouse.isDown = true;
+    triggerAgentChoreography('gesture.pinch()', 'touch contact');
   });
 
   canvas.addEventListener('touchend', () => {
     mouse.isDown = false;
   });
 
-  // MediaPipe Hand Connection Map (Bones)
-  const HAND_CONNECTIONS = [
-    [0,1], [1,2], [2,3], [3,4],       // Thumb
-    [0,5], [5,6], [6,7], [7,8],       // Index
-    [5,9], [9,10], [10,11], [11,12],  // Middle
-    [9,13], [13,14], [14,15], [15,16],// Ring
-    [13,17], [17,18], [18,19], [19,20],// Pinky
-    [0,17]                            // Palm base
-  ];
+  // Particle Sparks System
+  const particles = [];
+  function spawnSparks(x, y, count = 16, color = '#ffb733') {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 5 + 1.5;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        alpha: 1,
+        color,
+        size: Math.random() * 2.8 + 1
+      });
+    }
+  }
 
+  /* ==========================================================================
+     4. 3D MECH ROBOT (AR Avatar floating on left side of room)
+     ========================================================================== */
   const FINGERTIP_INDICES = [4, 8, 12, 16, 20];
   const FINGER_NAMES = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'];
 
-  // Gesture State Tracking
-  let lastGesture = 'IDLE';
-  let wasPinching = false;
-  let wasFist = false;
+  let mechState = {
+    yaw: 0.15,
+    pitch: 0,
+    targetYaw: 0.15,
+    targetPitch: 0,
+    armLift: 0,
+    isPinching: false,
+    energyPulse: 0
+  };
 
-  function classifyGesture(landmarks) {
-    if (!landmarks || landmarks.length < 21) return 'NONE';
-
-    // Tip 4 (Thumb) and Tip 8 (Index) distance
-    const p4 = landmarks[4];
-    const p8 = landmarks[8];
-    const pinchDist = Math.hypot(p4.x - p8.x, p4.y - p8.y);
-
-    // Tips vs MCP knuckles distance to check curled fingers
-    const wrist = landmarks[0];
-    const isIndexExtended = Math.hypot(p8.x - wrist.x, p8.y - wrist.y) > Math.hypot(landmarks[6].x - wrist.x, landmarks[6].y - wrist.y);
-    const isMiddleExtended = Math.hypot(landmarks[12].x - wrist.x, landmarks[12].y - wrist.y) > Math.hypot(landmarks[10].x - wrist.x, landmarks[10].y - wrist.y);
-    const isRingExtended = Math.hypot(landmarks[16].x - wrist.x, landmarks[16].y - wrist.y) > Math.hypot(landmarks[14].x - wrist.y, landmarks[14].y - wrist.y);
-    const isPinkyExtended = Math.hypot(landmarks[20].x - wrist.x, landmarks[20].y - wrist.y) > Math.hypot(landmarks[18].x - wrist.y, landmarks[18].y - wrist.y);
-
-    // 1. PINCH
-    if (pinchDist < 0.075) {
-      return 'PINCH';
-    }
-
-    // 2. FIST (all 4 main fingers curled down)
-    if (!isIndexExtended && !isMiddleExtended && !isRingExtended && !isPinkyExtended) {
-      return 'FIST';
-    }
-
-    // 3. POINT (only index extended)
-    if (isIndexExtended && !isMiddleExtended && !isRingExtended && !isPinkyExtended) {
-      return 'POINT';
-    }
-
-    // 4. OPEN PALM (all fingers extended)
-    if (isIndexExtended && isMiddleExtended && isRingExtended && isPinkyExtended) {
-      return 'OPEN PALM';
-    }
-
-    return 'HAND TRACKED';
-  }
-
-  // Handle gesture trigger events
-  function handleGestureEvents(gesture, screenPoints) {
-    if (gesture !== lastGesture) {
-      gestureBadge.textContent = `[GESTURE: ${gesture}]`;
-      lastGesture = gesture;
-    }
-
-    if (gesture === 'PINCH' && !wasPinching) {
-      wasPinching = true;
-      audio.pinchSound();
-      runAgentTask('pinch.trigger()', 'MediaPipe landmark [4 & 8] contact detected');
-      const midX = (screenPoints[4].x + screenPoints[8].x) / 2;
-      const midY = (screenPoints[4].y + screenPoints[8].y) / 2;
-      spawnSparks(midX, midY, 20, '#22d3ee');
-    } else if (gesture !== 'PINCH') {
-      wasPinching = false;
-    }
-
-    if (gesture === 'FIST' && !wasFist) {
-      wasFist = true;
-      audio.fistSound();
-      runAgentTask('compact_heap()', 'Fist gesture triggered memory compaction');
-      spawnSparks(screenPoints[0].x, screenPoints[0].y, 16, '#f59e0b');
-    } else if (gesture !== 'FIST') {
-      wasFist = false;
-    }
-  }
-
-  // Generate synthetic hand if MediaPipe is not tracking
-  function getSyntheticLandmarks() {
-    const t = Date.now() * 0.002;
-    const mx = mouse.x;
-    const my = mouse.y;
-
-    const pinch = mouse.isDown ? 0.2 : 1.0;
-    const screenPts = {};
-
-    // Wrist
-    screenPts[0] = { x: mx, y: canvas.height * 0.92 };
-
-    const offsets = [
-      { ox: -65 * pinch, oy: -15 },  // 4 Thumb
-      { ox: -30 * pinch, oy: -80 },  // 8 Index
-      { ox: 5,   oy: -100 },         // 12 Middle
-      { ox: 40,  oy: -85 },          // 16 Ring
-      { ox: 75,  oy: -55 }           // 20 Pinky
-    ];
-
-    FINGERTIP_INDICES.forEach((tipIdx, i) => {
-      const cfg = offsets[i];
-      const wave = Math.sin(t + i * 0.7) * 4;
-      screenPts[tipIdx] = {
-        x: mx + cfg.ox + wave,
-        y: my + cfg.oy + (wave * 0.5)
-      };
-    });
-
+  // 3D Math Helper for Mech
+  function projectMech3D(x, y, z, yaw, pitch, scale, cx, cy) {
+    const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
+    const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
+    const x1 = x * cosY - z * sinY;
+    const z1 = x * sinY + z * cosY;
+    const y2 = y * cosP - z1 * sinP;
+    const z2 = y * sinP + z1 * cosP + 220;
+    const fov = 260 / z2;
     return {
-      screenPoints: screenPts,
-      gesture: mouse.isDown ? 'PINCH' : 'OPEN PALM',
-      wrist: screenPts[0]
+      x: cx + x1 * scale * fov,
+      y: cy + y2 * scale * fov
     };
   }
 
-  // Draw Sci-Fi HUD Frame
-  function renderHUD() {
+  function drawMechFace(pts, fill, stroke, width = 1) {
+    if (pts.length < 3) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke(); }
+  }
+
+  // Draw the Floating 3D Robot in AR space (on the left)
+  function renderFloatingMech(cx, cy, scale) {
+    const now = performance.now() * 0.001;
+    const breath = Math.sin(now * 2.2) * 3;
+
+    // Smooth Damping to Hand Target
+    mechState.yaw += (mechState.targetYaw - mechState.yaw) * 0.1;
+    mechState.pitch += (mechState.targetPitch - mechState.pitch) * 0.1;
+    if (mechState.energyPulse > 0) mechState.energyPulse -= 0.04;
+
+    const yaw = mechState.yaw;
+    const pitch = mechState.pitch;
+
+    // 1. ORANGE HUD BRACKET BOX (AGENT : C03NJU7S | STATUS: IDLE)
+    const hudW = 200 * (scale / 1.3);
+    const hudH = 260 * (scale / 1.3);
+    const hudX = cx - hudW / 2;
+    const hudY = cy - hudH / 2 - 20;
+
+    ctx.save();
+    // Orange Corner Brackets
+    ctx.strokeStyle = '#ff9900';
+    ctx.lineWidth = 1.8;
+    ctx.shadowColor = 'rgba(255, 153, 0, 0.6)';
+    ctx.shadowBlur = 8;
+
+    const cL = 16;
+    // Top-Left
+    ctx.beginPath(); ctx.moveTo(hudX, hudY + cL); ctx.lineTo(hudX, hudY); ctx.lineTo(hudX + cL, hudY); ctx.stroke();
+    // Top-Right
+    ctx.beginPath(); ctx.moveTo(hudX + hudW - cL, hudY); ctx.lineTo(hudX + hudW, hudY); ctx.lineTo(hudX + hudW, hudY + cL); ctx.stroke();
+    // Bottom-Left
+    ctx.beginPath(); ctx.moveTo(hudX, hudY + hudH - cL); ctx.lineTo(hudX, hudY + hudH); ctx.lineTo(hudX + cL, hudY + hudH); ctx.stroke();
+    // Bottom-Right
+    ctx.beginPath(); ctx.moveTo(hudX + hudW - cL, hudY + hudH); ctx.lineTo(hudX + hudW, hudY + hudH); ctx.lineTo(hudX + hudW, hudY + hudH - cL); ctx.stroke();
+
+    // Top Label: AGENT : C03NJU7S / STATUS: IDLE
+    ctx.font = 'bold 10.5px "JetBrains Mono"';
+    ctx.fillStyle = '#ff9900';
+    ctx.fillText('AGENT : C03NJU7S', hudX + 8, hudY - 10);
+    ctx.fillText(mechState.isPinching ? 'STATUS: ACTIVE' : 'STATUS: IDLE', hudX + 8, hudY + 6);
+
+    // Bottom Buttons [ A ] [ ▶▶ ]
+    ctx.strokeRect(hudX + 8, hudY + hudH - 24, 22, 16);
+    ctx.fillText('A', hudX + 15, hudY + hudH - 12);
+    ctx.strokeRect(hudX + 36, hudY + hudH - 24, 28, 16);
+    ctx.fillText('▶▶', hudX + 41, hudY + hudH - 12);
+    ctx.restore();
+
+    // 2. MECH ROBOT BODY (Blue Mecha with CRT Monitor Face)
+    const torsoY = cy + 10 + breath;
+
+    // Head / CRT Monitor Box
+    const headY = torsoY - 60;
+    const hBox = [
+      [-22, headY - 18, -16], [22, headY - 18, -16], [20, headY + 16, -14], [-20, headY + 16, -14],
+      [-20, headY - 18, 16],  [20, headY - 18, 16],  [18, headY + 16, 14],  [-18, headY + 16, 14]
+    ].map(pt => projectMech3D(pt[0], pt[1] - cy, pt[2], yaw * 1.2, pitch * 1.1, scale, cx, cy));
+
+    // Draw Blue Head Monitor
+    drawMechFace([hBox[0], hBox[1], hBox[2], hBox[3]], 'rgba(2, 132, 199, 0.45)', '#38bdf8', 1.8);
+    drawMechFace([hBox[0], hBox[3], hBox[7], hBox[4]], 'rgba(2, 132, 199, 0.25)', '#38bdf8', 1.2);
+    drawMechFace([hBox[1], hBox[2], hBox[6], hBox[5]], 'rgba(2, 132, 199, 0.25)', '#38bdf8', 1.2);
+
+    // Digital Screen Face on Monitor (Cute robot face [ ^ _ ^ ] or [ • _ • ])
+    const screenFace = projectMech3D(0, headY - cy, -15, yaw * 1.2, pitch * 1.1, scale, cx, cy);
+    ctx.save();
+    ctx.fillStyle = '#00e5ff';
+    ctx.shadowColor = '#00e5ff';
+    ctx.shadowBlur = 12;
+    ctx.font = 'bold 15px "JetBrains Mono"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(mechState.isPinching ? '^ _ ^' : '• _ •', screenFace.x, screenFace.y);
+    ctx.restore();
+
+    // Blue Torso Armor
+    const tBox = [
+      [-32, torsoY - 32, -16], [32, torsoY - 32, -16], [24, torsoY + 28, -14], [-24, torsoY + 28, -14],
+      [-28, torsoY - 32, 16],  [28, torsoY - 32, 16],  [20, torsoY + 28, 14],  [-20, torsoY + 28, 14]
+    ].map(pt => projectMech3D(pt[0], pt[1] - cy, pt[2], yaw * 0.8, pitch * 0.7, scale, cx, cy));
+
+    drawMechFace([tBox[0], tBox[1], tBox[2], tBox[3]], 'rgba(14, 116, 144, 0.45)', '#06b6d4', 1.8);
+    drawMechFace([tBox[0], tBox[3], tBox[7], tBox[4]], 'rgba(14, 116, 144, 0.25)', '#06b6d4', 1.2);
+    drawMechFace([tBox[1], tBox[2], tBox[6], tBox[5]], 'rgba(14, 116, 144, 0.25)', '#06b6d4', 1.2);
+
+    // Chest Glowing Core (Arc Reactor)
+    const coreP = projectMech3D(0, torsoY - cy - 4, -15, yaw * 0.8, pitch * 0.7, scale, cx, cy);
+    ctx.beginPath();
+    ctx.arc(coreP.x, coreP.y, 6 + mechState.energyPulse * 4, 0, Math.PI * 2);
+    ctx.fillStyle = mechState.isPinching ? '#ffffff' : '#ff9900';
+    ctx.shadowColor = '#ff9900';
+    ctx.shadowBlur = 14;
+    ctx.fill();
+
+    // Arms (Left & Right)
+    const lSh = projectMech3D(-40, torsoY - cy - 24, 0, yaw * 0.8, pitch * 0.7, scale, cx, cy);
+    const lEl = projectMech3D(-48, torsoY - cy + 12, -8, yaw * 0.8, pitch * 0.7, scale, cx, cy);
+    const lHn = projectMech3D(-42, torsoY - cy + 45, 0, yaw * 0.8, pitch * 0.7, scale, cx, cy);
+
+    ctx.beginPath();
+    ctx.moveTo(lSh.x, lSh.y); ctx.lineTo(lEl.x, lEl.y); ctx.lineTo(lHn.x, lHn.y);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+
+    const rSh = projectMech3D(40, torsoY - cy - 24, 0, yaw * 0.8, pitch * 0.7, scale, cx, cy);
+    const rEl = projectMech3D(48, torsoY - cy + 12 - mechState.armLift * 25, -8, yaw * 0.8, pitch * 0.7, scale, cx, cy);
+    const rHn = projectMech3D(42, torsoY - cy + 45 - mechState.armLift * 45, 0, yaw * 0.8, pitch * 0.7, scale, cx, cy);
+
+    ctx.beginPath();
+    ctx.moveTo(rSh.x, rSh.y); ctx.lineTo(rEl.x, rEl.y); ctx.lineTo(rHn.x, rHn.y);
+    ctx.strokeStyle = mechState.isPinching ? '#00e5ff' : '#38bdf8';
+    ctx.lineWidth = mechState.isPinching ? 4.5 : 3.5;
+    ctx.stroke();
+  }
+
+  /* ==========================================================================
+     5. MAIN AR HUD RENDER LOOP (Webcam + Hand Tracking + Golden Fibers)
+     ========================================================================== */
+  function renderAR() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const t = Date.now() * 0.003;
 
+    // 1. Determine Hand Landmarks
     let screenPoints = {};
-    let currentGesture = 'IDLE';
-    let wrist = { x: canvas.width / 2, y: canvas.height * 0.9 };
+    let isPinching = false;
+    let handX = canvas.width * 0.48;
+    let handY = canvas.height * 0.52;
 
     if (isMediaPipeActive && rawLandmarks && rawLandmarks.length === 21) {
-      // Map MediaPipe 0..1 to mirrored screen coords
       rawLandmarks.forEach((lm, idx) => {
         screenPoints[idx] = {
           x: (1 - lm.x) * canvas.width,
           y: lm.y * canvas.height
         };
       });
-      wrist = screenPoints[0];
-      currentGesture = classifyGesture(rawLandmarks);
-      handleGestureEvents(currentGesture, screenPoints);
 
-      // Feed into 3D Mech Puppet
-      const tip8 = screenPoints[8] || screenPoints[0];
-      const normX = tip8.x / canvas.width;
-      const normY = tip8.y / canvas.height;
-      puppetState.handDetected = true;
-      puppetState.targetYaw = (normX - 0.5) * 1.5;
-      puppetState.targetPitch = (normY - 0.5) * 0.9;
-      puppetState.targetArmLift = Math.max(0, Math.min(1.2, (canvas.height * 0.85 - tip8.y) / (canvas.height * 0.6)));
-      puppetState.isPinching = currentGesture === 'PINCH';
-      puppetState.isFist = currentGesture === 'FIST';
-      if (puppetState.isPinching) puppetState.pulseEnergy = 1.0;
+      // Pinch detection (Thumb #4 to Index #8)
+      const dist = Math.hypot(screenPoints[4].x - screenPoints[8].x, screenPoints[4].y - screenPoints[8].y);
+      isPinching = dist < 42;
+      handX = screenPoints[8].x;
+      handY = screenPoints[8].y;
+
+      if (isPinching && !mechState.isPinching) {
+        triggerAgentChoreography('pinch.trigger()', 'MediaPipe landmark contact');
+        spawnSparks((screenPoints[4].x + screenPoints[8].x)/2, (screenPoints[4].y + screenPoints[8].y)/2, 22, '#00e5ff');
+      }
     } else {
-      const synth = getSyntheticLandmarks();
-      screenPoints = synth.screenPoints;
-      currentGesture = synth.gesture;
-      wrist = synth.wrist;
-      if (mouse.isDown) {
-        gestureBadge.textContent = '[GESTURE: PINCH (VIRTUAL)]';
-      } else {
-        gestureBadge.textContent = '[GESTURE: MOUSE TRACKED]';
-      }
+      // Virtual Mouse Hand
+      handX = mouse.x;
+      handY = mouse.y;
+      isPinching = mouse.isDown;
 
-      // Feed virtual mouse into 3D Mech Puppet
-      const normX = mouse.x / canvas.width;
-      const normY = mouse.y / canvas.height;
-      puppetState.handDetected = true;
-      puppetState.targetYaw = (normX - 0.5) * 1.5;
-      puppetState.targetPitch = (normY - 0.5) * 0.9;
-      puppetState.targetArmLift = Math.max(0, Math.min(1.2, (canvas.height * 0.85 - mouse.y) / (canvas.height * 0.6)));
-      puppetState.isPinching = mouse.isDown;
-      puppetState.isFist = false;
-      if (mouse.isDown) puppetState.pulseEnergy = 1.0;
-    }
-
-    // 1. Draw Skeleton Bones if enabled
-    if (showSkeleton && isMediaPipeActive && rawLandmarks) {
-      ctx.beginPath();
-      ctx.strokeStyle = 'rgba(6, 182, 212, 0.4)';
-      ctx.lineWidth = 1.5;
-      HAND_CONNECTIONS.forEach(([a, b]) => {
-        if (screenPoints[a] && screenPoints[b]) {
-          ctx.moveTo(screenPoints[a].x, screenPoints[a].y);
-          ctx.lineTo(screenPoints[b].x, screenPoints[b].y);
-        }
+      const pinchO = isPinching ? 0.25 : 1.0;
+      const offsets = [
+        { ox: -65 * pinchO, oy: -15 },
+        { ox: -30 * pinchO, oy: -80 },
+        { ox: 5,   oy: -100 },
+        { ox: 40,  oy: -85 },
+        { ox: 75,  oy: -55 }
+      ];
+      FINGERTIP_INDICES.forEach((idx, i) => {
+        const wave = Math.sin(t + i * 0.7) * 4;
+        screenPoints[idx] = {
+          x: mouse.x + offsets[i].ox + wave,
+          y: mouse.y + offsets[i].oy + wave * 0.5
+        };
       });
-      ctx.stroke();
-
-      // Knuckle joints
-      for (let i = 0; i < 21; i++) {
-        if (!FINGERTIP_INDICES.includes(i) && screenPoints[i]) {
-          ctx.beginPath();
-          ctx.arc(screenPoints[i].x, screenPoints[i].y, 3, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(34, 211, 238, 0.6)';
-          ctx.fill();
-        }
-      }
     }
 
-    // 2. Draw Holographic Fiber Energy Threads from Wrist to Fingertips
+    // Update Mech Avatar target tracking
+    mechState.targetYaw = (handX / canvas.width - 0.5) * 1.4;
+    mechState.targetPitch = (handY / canvas.height - 0.5) * 0.8;
+    mechState.armLift = Math.max(0, Math.min(1.2, (canvas.height * 0.85 - handY) / (canvas.height * 0.6)));
+    mechState.isPinching = isPinching;
+    if (isPinching) mechState.energyPulse = 1.0;
+
+    // 2. RENDER FLOATING 3D MECH (Left side of screen: x = 18%, y = 52%)
+    const mechCenterX = canvas.width * 0.18;
+    const mechCenterY = canvas.height * 0.52;
+    renderFloatingMech(mechCenterX, mechCenterY, 1.3);
+
+    // 3. RENDER GOLDEN FIBER OPTIC THREADS (Draping from Fingertips down towards bottom-left)
+    const baseAnchorX = canvas.width * 0.32;
+    const baseAnchorY = canvas.height * 0.95;
+
     FINGERTIP_INDICES.forEach((tipIdx, i) => {
       const pt = screenPoints[tipIdx];
       if (!pt) return;
 
-      const wx = wrist.x + (i - 2) * 16;
-      const wy = wrist.y;
+      const wx = baseAnchorX + (i - 2) * 22;
+      const wy = baseAnchorY;
       const fx = pt.x;
       const fy = pt.y;
 
-      const strands = 3;
-      for (let s = 0; s < strands; s++) {
-        const offset = (s - 1) * 3;
-        const cp1x = wx + (fx - wx) * 0.2 + Math.sin(t + i + s) * 18;
-        const cp1y = wy - (wy - fy) * 0.35;
-        const cp2x = fx + Math.cos(t * 0.8 + i) * 14;
-        const cp2y = fy + (wy - fy) * 0.25;
+      // Volumetric fiber optic strands
+      for (let s = 0; s < 3; s++) {
+        const off = (s - 1) * 3;
+        const cp1x = wx + (fx - wx) * 0.18 + Math.sin(t + i + s) * 22;
+        const cp1y = wy - (wy - fy) * 0.45;
+        const cp2x = fx + Math.cos(t * 0.8 + i) * 18;
+        const cp2y = fy + (wy - fy) * 0.28;
 
         ctx.beginPath();
-        ctx.moveTo(wx + offset, wy);
-        ctx.bezierCurveTo(cp1x + offset, cp1y, cp2x + offset, cp2y, fx, fy);
+        ctx.moveTo(wx + off, wy);
+        ctx.bezierCurveTo(cp1x + off, cp1y, cp2x + off, cp2y, fx, fy);
 
         const grad = ctx.createLinearGradient(wx, wy, fx, fy);
-        grad.addColorStop(0, 'rgba(245, 158, 11, 0.15)');
-        grad.addColorStop(0.7, 'rgba(251, 191, 36, 0.85)');
+        grad.addColorStop(0, 'rgba(255, 153, 0, 0.15)');
+        grad.addColorStop(0.65, 'rgba(255, 183, 51, 0.85)');
         grad.addColorStop(1, '#ffffff');
 
         ctx.strokeStyle = grad;
-        ctx.lineWidth = s === 1 ? 2.5 : 1.2;
-        ctx.shadowColor = '#f59e0b';
-        ctx.shadowBlur = s === 1 ? 14 : 6;
+        ctx.lineWidth = s === 1 ? 2.6 : 1.2;
+        ctx.shadowColor = '#ff9900';
+        ctx.shadowBlur = s === 1 ? 16 : 8;
         ctx.stroke();
       }
     });
 
-    // 3. Fingertip Glowing Spheres & HUD Reticles
+    // 4. RENDER FINGERTIP GLOWING NODES (5 White Glowing Spheres)
     FINGERTIP_INDICES.forEach((tipIdx, i) => {
       const pt = screenPoints[tipIdx];
       if (!pt) return;
 
-      const isIndex = tipIdx === 8;
-      const isThumb = tipIdx === 4;
-      const isPinchActive = currentGesture === 'PINCH';
-
-      // Ring
+      // Outer glow ring
       ctx.beginPath();
-      ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2);
-      ctx.strokeStyle = (isIndex || isThumb) && isPinchActive ? '#22d3ee' : '#f59e0b';
+      ctx.arc(pt.x, pt.y, 11, 0, Math.PI * 2);
+      ctx.strokeStyle = isPinching && (tipIdx === 4 || tipIdx === 8) ? '#00e5ff' : '#ff9900';
       ctx.lineWidth = 1.6;
       ctx.shadowColor = ctx.strokeStyle;
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 12;
       ctx.stroke();
 
-      // Glowing dot
+      // Core white sphere
       ctx.beginPath();
-      ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
-      ctx.shadowBlur = 15;
+      ctx.shadowBlur = 18;
       ctx.fill();
 
-      // Crosshairs
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      // Crosshair ticks
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
       ctx.lineWidth = 1;
       ctx.shadowBlur = 0;
       ctx.beginPath();
-      ctx.moveTo(pt.x - 14, pt.y); ctx.lineTo(pt.x - 8, pt.y);
-      ctx.moveTo(pt.x + 8, pt.y); ctx.lineTo(pt.x + 14, pt.y);
-      ctx.moveTo(pt.x, pt.y - 14); ctx.lineTo(pt.x, pt.y - 8);
-      ctx.moveTo(pt.x, pt.y + 8); ctx.lineTo(pt.x, pt.y + 14);
+      ctx.moveTo(pt.x - 14, pt.y); ctx.lineTo(pt.x - 7, pt.y);
+      ctx.moveTo(pt.x + 7, pt.y); ctx.lineTo(pt.x + 14, pt.y);
+      ctx.moveTo(pt.x, pt.y - 14); ctx.lineTo(pt.x, pt.y - 7);
+      ctx.moveTo(pt.x, pt.y + 7); ctx.lineTo(pt.x, pt.y + 14);
       ctx.stroke();
-
-      // Label
-      ctx.fillStyle = 'rgba(251, 191, 36, 0.75)';
-      ctx.font = '9px "JetBrains Mono"';
-      ctx.fillText(`${FINGER_NAMES[i].toUpperCase()} [${Math.round(pt.x)}, ${Math.round(pt.y)}]`, pt.x + 14, pt.y - 6);
     });
 
-    // 4. Pinch Proximity Line (Thumb to Index)
+    // 5. PINCH PROXIMITY LINE
     if (screenPoints[4] && screenPoints[8]) {
       const p4 = screenPoints[4];
       const p8 = screenPoints[8];
-      const pDist = Math.hypot(p4.x - p8.x, p4.y - p8.y);
-
-      if (pDist < 140) {
-        const midX = (p4.x + p8.x) / 2;
-        const midY = (p4.y + p8.y) / 2;
-
+      const d = Math.hypot(p4.x - p8.x, p4.y - p8.y);
+      if (d < 120) {
         ctx.beginPath();
         ctx.moveTo(p4.x, p4.y);
         ctx.lineTo(p8.x, p8.y);
-        ctx.strokeStyle = currentGesture === 'PINCH' ? '#22d3ee' : 'rgba(245, 158, 11, 0.6)';
-        ctx.lineWidth = currentGesture === 'PINCH' ? 3 : 1.5;
-        ctx.shadowColor = currentGesture === 'PINCH' ? '#06b6d4' : '#f59e0b';
+        ctx.strokeStyle = isPinching ? '#00e5ff' : 'rgba(255, 153, 0, 0.7)';
+        ctx.lineWidth = isPinching ? 3 : 1.5;
+        ctx.shadowColor = isPinching ? '#00e5ff' : '#ff9900';
         ctx.shadowBlur = 12;
         ctx.stroke();
-
-        ctx.fillStyle = currentGesture === 'PINCH' ? '#22d3ee' : '#f59e0b';
-        ctx.font = '10px "JetBrains Mono"';
-        ctx.fillText(currentGesture === 'PINCH' ? '⚡ [PINCH TRIGGERED]' : `PINCH: ${Math.round(pDist)}px`, midX + 10, midY - 10);
       }
     }
 
-    // 5. Render Particle Sparks
+    // 6. RENDER BURSTING PARTICLES
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.x += p.vx;
@@ -1392,31 +879,31 @@
       ctx.fillStyle = p.color;
       ctx.globalAlpha = p.alpha;
       ctx.shadowColor = p.color;
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 10;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1.0;
 
-    requestAnimationFrame(renderHUD);
+    requestAnimationFrame(renderAR);
   }
-  renderHUD();
+  renderAR();
 
   /* ==========================================================================
-     5. MEDIAPIPE INITIALIZATION & CAMERA ENGINE
+     6. MEDIAPIPE WEBCAM CONTROLS
      ========================================================================== */
-  const btnCamToggle = document.getElementById('btnCamToggle');
-  const btnSkeletonToggle = document.getElementById('btnSkeletonToggle');
-  const btnAudioToggle = document.getElementById('btnAudioToggle');
+  const btnCamera = document.getElementById('btnCamera');
+  const btnAudio = document.getElementById('btnAudio');
   const btnAutoDemo = document.getElementById('btnAutoDemo');
+  const btnFullscreen = document.getElementById('btnFullscreen');
 
   let mpHands = null;
   let mpCamera = null;
 
-  async function initMediaPipe() {
-    mpStatus.textContent = 'LOADING...';
+  async function startWebcamMediaPipe() {
     try {
+      btnCamera.textContent = '⏳ STARTING...';
       mpHands = new Hands({
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
       });
@@ -1431,91 +918,63 @@
       mpHands.onResults((results) => {
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
           rawLandmarks = results.multiHandLandmarks[0];
-          const conf = (98.5 + Math.random() * 1.4).toFixed(1);
-          confVal.textContent = `${conf}%`;
+          gestureHint.textContent = '● HAND TRACKED &bull; PINCH THUMB+INDEX TO CHOREOGRAPH';
         } else {
           rawLandmarks = null;
+          gestureHint.textContent = '🖐️ RAISE HAND TO CAMERA &bull; PINCH THUMB+INDEX TO TRIGGER';
         }
       });
 
-      mpStatus.textContent = 'ONLINE';
-      addLog('> MediaPipe Hands neural model initialized', 'ok');
-      return true;
+      mpCamera = new Camera(webcam, {
+        onFrame: async () => {
+          if (isMediaPipeActive && mpHands) {
+            await mpHands.send({ image: webcam });
+          }
+        },
+        width: 1280,
+        height: 720
+      });
+
+      await mpCamera.start();
+      isMediaPipeActive = true;
+      roomFallback.classList.add('hidden');
+      btnCamera.textContent = '🛑 STOP CAMERA';
+      btnCamera.classList.add('active');
+      addLog('> passthrough webcam feed linked to MediaPipe', 't-ok');
     } catch (err) {
-      console.error('Failed to initialize MediaPipe:', err);
-      mpStatus.textContent = 'OFFLINE';
-      addLog('! MediaPipe failed to load, fallback to virtual mode', 'cmd');
-      return false;
+      console.warn('MediaPipe camera error:', err);
+      alert('Camera access denied or unavailable. You can use Virtual Mouse mode on screen!');
+      btnCamera.textContent = '📹 START CAMERA';
     }
   }
 
-  btnCamToggle.addEventListener('click', async () => {
+  btnCamera.addEventListener('click', async () => {
     if (!isMediaPipeActive) {
-      btnCamToggle.textContent = '⏳ STARTING...';
-      const loaded = await initMediaPipe();
-      if (!loaded) {
-        alert('Could not initialize MediaPipe. Check network connection.');
-        btnCamToggle.textContent = '📹 START MEDIAPIPE WEBCAM';
-        return;
-      }
-
-      try {
-        webcam.style.display = 'block';
-        mpCamera = new Camera(webcam, {
-          onFrame: async () => {
-            if (isMediaPipeActive && mpHands) {
-              await mpHands.send({ image: webcam });
-            }
-          },
-          width: 1280,
-          height: 720
-        });
-
-        await mpCamera.start();
-        isMediaPipeActive = true;
-        btnCamToggle.textContent = '🛑 STOP MEDIAPIPE';
-        btnCamToggle.classList.add('active');
-        trackingModeDisplay.textContent = 'MEDIAPIPE LIVE CAMERA';
-        guideMsg.textContent = '🖐️ RAISE HAND TO CAMERA &bull; PINCH THUMB+INDEX TO TRIGGER';
-        addLog('> live video feed hooked to MediaPipe Hands pipeline', 'ok');
-      } catch (err) {
-        console.warn('Webcam stream error:', err);
-        webcam.style.display = 'none';
-        btnCamToggle.textContent = '📹 START MEDIAPIPE WEBCAM';
-        alert('Camera access denied or unavailable. You can continue using Virtual Mouse mode!');
-      }
+      await startWebcamMediaPipe();
     } else {
       if (mpCamera) {
         await mpCamera.stop();
         mpCamera = null;
       }
-      webcam.style.display = 'none';
       isMediaPipeActive = false;
       rawLandmarks = null;
-      btnCamToggle.textContent = '📹 START MEDIAPIPE WEBCAM';
-      btnCamToggle.classList.remove('active');
-      trackingModeDisplay.textContent = 'VIRTUAL / MOUSE';
-      guideMsg.textContent = 'CLICK "START MEDIAPIPE WEBCAM" TO TRACK REAL HANDS • OR USE MOUSE / TOUCH';
-      addLog('> MediaPipe tracking suspended, back to virtual mode', 'cmd');
+      roomFallback.classList.remove('hidden');
+      btnCamera.textContent = '📹 START CAMERA';
+      btnCamera.classList.remove('active');
+      gestureHint.textContent = '🖐️ MOUSE / TOUCH CONTROL ENGAGED';
+      addLog('> camera stopped, back to virtual mode', 't-lift');
     }
   });
 
-  btnSkeletonToggle.addEventListener('click', () => {
-    showSkeleton = !showSkeleton;
-    btnSkeletonToggle.textContent = `🦴 SKELETON: ${showSkeleton ? 'ON' : 'OFF'}`;
-    btnSkeletonToggle.classList.toggle('active', showSkeleton);
-  });
-
-  btnAudioToggle.addEventListener('click', () => {
+  btnAudio.addEventListener('click', () => {
     audio.enabled = !audio.enabled;
     if (audio.enabled) {
       audio.init();
-      audio.beep(880, 0.08);
-      btnAudioToggle.textContent = '🔊 AUDIO: ON';
-      btnAudioToggle.classList.remove('active');
+      btnAudio.textContent = '🔊 AUDIO: ON';
+      btnAudio.classList.remove('active');
     } else {
-      btnAudioToggle.textContent = '🔇 AUDIO: MUTED';
-      btnAudioToggle.classList.add('active');
+      btnAudio.textContent = '🔇 AUDIO: MUTED';
+      btnAudio.classList.add('active');
     }
   });
 
@@ -1524,100 +983,35 @@
     if (!autoDemoInterval) {
       btnAutoDemo.classList.add('active');
       btnAutoDemo.textContent = '⚡ DEMO RUNNING...';
-      addLog('> autonomous agent choreography initiated', 'idea');
+      addLog('> autonomous agent choreography initiated', 't-idea');
 
       let step = 0;
       autoDemoInterval = setInterval(() => {
         const tasks = [
-          () => runAgentTask('string_solver', 'optimizing ast tokens'),
-          () => runAgentTask('compact_heap()', '1.8G heap compacted in 1.2s'),
-          () => runAgentTask('gesture_compiler', 'hand tracked agent C03NJU7S'),
-          () => runAgentTask('choreography.step()', 'IDEA 12: puppets that dream when idle')
+          () => triggerAgentChoreography('world_indexer', 'mapping source files'),
+          () => triggerAgentChoreography('compact_heap()', '1.8G compacted in 1.4s'),
+          () => triggerAgentChoreography('gesture_compiler', 'hand tracked agent C03NJU7S'),
+          () => triggerAgentChoreography('puppets_dream', 'IDEA 12: puppets that dream when idle')
         ];
         tasks[step % tasks.length]();
         step++;
-      }, 3500);
+      }, 3200);
     } else {
       clearInterval(autoDemoInterval);
       autoDemoInterval = null;
       btnAutoDemo.classList.remove('active');
       btnAutoDemo.textContent = '⚡ AUTO-CHOREOGRAPHY';
-      addLog('> autonomous demo paused', 'cmd');
+      addLog('> autonomous demo paused', 't-cmd');
     }
   });
 
-  // Dynamic FPS & Telemetry
-  let frameCount = 0;
-  let lastTime = performance.now();
-  function updateFPS() {
-    frameCount++;
-    const now = performance.now();
-    if (now - lastTime >= 1000) {
-      document.getElementById('fpsVal').textContent = frameCount;
-      frameCount = 0;
-      lastTime = now;
-    }
-    requestAnimationFrame(updateFPS);
-  }
-  updateFPS();
-
-  /* ==========================================================================
-     6. VIEWPORT ZOOM & ASPECT RATIO CONTROLS
-     ========================================================================== */
-  let currentZoom = 1.0;
-  let isFitCover = false;
-  const zoomReadout = document.getElementById('zoomReadout');
-
-  function updateZoom(newZoom) {
-    currentZoom = Math.max(0.4, Math.min(2.5, Math.round(newZoom * 100) / 100));
-    zoomReadout.textContent = `${Math.round(currentZoom * 100)}%`;
-    webcam.style.transform = `scaleX(-${currentZoom}) scaleY(${currentZoom})`;
-  }
-
-  document.getElementById('btnZoomIn').addEventListener('click', () => {
-    updateZoom(currentZoom + 0.15);
-    addLog(`> zoom in: ${(currentZoom * 100).toFixed(0)}%`, 'cmd');
-  });
-
-  document.getElementById('btnZoomOut').addEventListener('click', () => {
-    updateZoom(currentZoom - 0.15);
-    addLog(`> zoom out: ${(currentZoom * 100).toFixed(0)}%`, 'cmd');
-  });
-
-  document.getElementById('btnZoomReset').addEventListener('click', () => {
-    updateZoom(1.0);
-    addLog('> zoom reset to default 100%', 'cmd');
-  });
-
-  const btnFitToggle = document.getElementById('btnFitToggle');
-  btnFitToggle.addEventListener('click', () => {
-    isFitCover = !isFitCover;
-    webcam.classList.toggle('fit-cover', isFitCover);
-    btnFitToggle.textContent = isFitCover ? '🔲 FILL' : '🔲 FIT';
-    btnFitToggle.classList.toggle('active', isFitCover);
-    addLog(`> video aspect mode: ${isFitCover ? 'FILL (COVER)' : 'FIT (CONTAIN)'}`, 'ok');
-  });
-
-  // Mouse wheel on canvas to zoom in/out smoothly
-  canvas.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const delta = e.deltaY < 0 ? 0.08 : -0.08;
-    updateZoom(currentZoom + delta);
-  }, { passive: false });
-
-  // Double click to reset zoom
-  canvas.addEventListener('dblclick', () => {
-    updateZoom(1.0);
-  });
-
-  // Keyboard shortcuts: 0 (reset), + (zoom in), - (zoom out)
-  window.addEventListener('keydown', (e) => {
-    if (e.key === '0' || e.key === 'r' || e.key === 'R') {
-      updateZoom(1.0);
-    } else if (e.key === '+' || e.key === '=') {
-      updateZoom(currentZoom + 0.15);
-    } else if (e.key === '-' || e.key === '_') {
-      updateZoom(currentZoom - 0.15);
+  btnFullscreen.addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      btnFullscreen.textContent = '🔲 EXIT FULLSCREEN';
+    } else {
+      document.exitFullscreen().catch(() => {});
+      btnFullscreen.textContent = '🔲 FULLSCREEN';
     }
   });
 </script>
