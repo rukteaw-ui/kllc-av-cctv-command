@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Agentic Coding // Holographic HUD</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Space+Grotesk:wght@600;700&display=swap');
+
+    :root {
+      --bg: #030508;
+      --amber: #f59e0b;
+      --amber-bright: #fbbf24;
+      --amber-glow: rgba(245, 158, 11, 0.45);
+      --cyan: #06b6d4;
+      --cyan-bright: #22d3ee;
+      --cyan-glow: rgba(6, 182, 212, 0.4);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --panel-bg: rgba(6, 10, 16, 0.82);
+      --panel-border: rgba(245, 158, 11, 0.35);
+      --panel-border-cyan: rgba(34, 211, 238, 0.35);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      user-select: none;
+    }
+
+    /* Sci-Fi Grid Backdrop & Scanlines */
+    .crt-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 50;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%),
+                  linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+      background-size: 100% 3px, 6px 100%;
+      opacity: 0.75;
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 40;
+      background: radial-gradient(circle at center, transparent 40%, rgba(2, 4, 8, 0.88) 100%);
+    }
+
+    /* Main Container */
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: 340px 1fr 400px;
+      grid-template-rows: 64px 1fr 60px;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    /* Header */
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid var(--panel-border);
+      background: var(--panel-bg);
+      padding: 0 20px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.1);
+      position: relative;
+    }
+
+    header::before, header::after {
+      content: '';
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: var(--amber);
+    }
+    header::before { top: -1px; left: -1px; }
+    header::after { bottom: -1px; right: -1px; }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      border: 2px solid var(--amber);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--amber);
+      font-weight: 800;
+      box-shadow: 0 0 12px var(--amber-glow);
+    }
+
+    .brand-title {
+      font-size: 14px;
+      letter-spacing: 2px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .brand-title span {
+      color: var(--cyan);
+      text-shadow: 0 0 10px var(--cyan-glow);
+    }
+
+    .sys-stats {
+      display: flex;
+      gap: 20px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .stat-pill {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      padding: 4px 10px;
+      border-radius: 4px;
+    }
+    .stat-pill b {
+      color: var(--amber-bright);
+    }
+
+    /* Center Stage (Canvas & Video) */
+    .stage-container {
+      position: relative;
+      border: 1px solid var(--panel-border-cyan);
+      background: #020408;
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 0 40px rgba(6, 182, 212, 0.1);
+    }
+
+    #webcam {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+      opacity: 0.35;
+      filter: contrast(1.2) brightness(0.7) hue-rotate(180deg);
+    }
+
+    #hudCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      cursor: crosshair;
+    }
+
+    .hud-guide-text {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      background: rgba(4, 8, 14, 0.85);
+      border: 1px solid var(--panel-border-cyan);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--cyan-bright);
+      letter-spacing: 1px;
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+      pointer-events: none;
+    }
+
+    /* Left Panel: Mech Agent HUD */
+    .agent-panel {
+      border: 1px solid var(--panel-border);
+      background: var(--panel-bg);
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      gap: 14px;
+      position: relative;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px dashed rgba(245, 158, 11, 0.3);
+      padding-bottom: 8px;
+    }
+
+    .agent-badge {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--amber-bright);
+      text-shadow: 0 0 8px var(--amber-glow);
+      letter-spacing: 1.5px;
+    }
+
+    .status-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid var(--amber);
+      color: var(--amber-bright);
+      border-radius: 3px;
+      animation: pulseGlow 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.8; box-shadow: 0 0 4px var(--amber-glow); }
+      50% { opacity: 1; box-shadow: 0 0 12px var(--amber-glow); }
+    }
+
+    .mech-viewport {
+      width: 100%;
+      height: 220px;
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.08) 0%, transparent 70%);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      border-radius: 4px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #mechCanvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    .agent-telemetry {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 11px;
+    }
+
+    .bar-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+    }
+
+    .bar-bg {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--amber), var(--amber-bright));
+      width: 65%;
+      box-shadow: 0 0 8px var(--amber-glow);
+      transition: width 0.3s ease;
+    }
+
+    .gesture-triggers {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: auto;
+    }
+
+    .gesture-btn {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: var(--amber-bright);
+      padding: 8px 6px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .gesture-btn:hover {
+      background: rgba(245, 158, 11, 0.25);
+      border-color: var(--amber-bright);
+      box-shadow: 0 0 10px var(--amber-glow);
+      transform: translateY(-1px);
+    }
+
+    .gesture-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Right Panel: Sci-Fi Terminal */
+    .terminal-panel {
+      border: 1px solid var(--panel-border);
+      background: var(--panel-bg);
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      position: relative;
+    }
+
+    .term-titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+      padding-bottom: 8px;
+      margin-bottom: 10px;
+      font-size: 11px;
+      color: var(--amber);
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .term-dots {
+      display: flex;
+      gap: 4px;
+    }
+
+    .term-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 1px solid var(--amber);
+    }
+
+    .term-log {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 11.5px;
+      line-height: 1.6;
+      color: rgba(255, 235, 190, 0.9);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding-right: 4px;
+    }
+
+    .term-log::-webkit-scrollbar {
+      width: 4px;
+    }
+    .term-log::-webkit-scrollbar-thumb {
+      background: rgba(245, 158, 11, 0.4);
+      border-radius: 2px;
+    }
+
+    .log-line {
+      word-break: break-all;
+    }
+    .log-line.cmd {
+      color: #38bdf8;
+      font-weight: 700;
+    }
+    .log-line.ok {
+      color: #4ade80;
+    }
+    .log-line.idea {
+      color: #fbbf24;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+    .log-line.lifting {
+      color: #cbd5e1;
+    }
+    .log-line.done {
+      color: #a3e635;
+      font-weight: 600;
+    }
+    .cursor-blink {
+      display: inline-block;
+      width: 8px;
+      height: 14px;
+      background: var(--amber);
+      vertical-align: middle;
+      animation: blink 1s step-end infinite;
+      margin-left: 4px;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* Footer Toolbar */
+    footer {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid var(--panel-border-cyan);
+      background: var(--panel-bg);
+      padding: 0 16px;
+      font-size: 11px;
+    }
+
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .toggle-control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: color 0.2s;
+    }
+    .toggle-control:hover {
+      color: #fff;
+    }
+
+    .footer-btn {
+      background: rgba(6, 182, 212, 0.12);
+      border: 1px solid var(--panel-border-cyan);
+      color: var(--cyan-bright);
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 1px;
+    }
+    .footer-btn:hover {
+      background: rgba(6, 182, 212, 0.25);
+      box-shadow: 0 0 12px var(--cyan-glow);
+    }
+    .footer-btn.active {
+      background: var(--cyan);
+      color: #020408;
+    }
+  </style>
+</head>
+<body>
+
+<div class="crt-overlay"></div>
+<div class="vignette"></div>
+
+<div id="app">
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">&lt;/&gt;</div>
+      <div class="brand-title">AI AGENTIC CODING // <span>HOLOGRAPHIC CHOREOGRAPHY</span></div>
+    </div>
+    <div class="sys-stats">
+      <div class="stat-pill">MODE: <b id="trackingModeDisplay">VIRTUAL / MOUSE</b></div>
+      <div class="stat-pill">FPS: <b id="fpsVal">60</b></div>
+      <div class="stat-pill">AGENT LATENCY: <b id="latencyVal">8.4ms</b></div>
+      <div class="stat-pill">CONFIDENCE: <b id="confVal">99.8%</b></div>
+    </div>
+  </header>
+
+  <!-- Left: Mech Agent HUD -->
+  <div class="agent-panel">
+    <div class="panel-header">
+      <div class="agent-badge">AGENT: C03NJU7S</div>
+      <div class="status-tag" id="agentStatus">IDLE</div>
+    </div>
+
+    <!-- 3D Holographic Mech Canvas -->
+    <div class="mech-viewport">
+      <canvas id="mechCanvas"></canvas>
+    </div>
+
+    <div class="agent-telemetry">
+      <div class="bar-group">
+        <div class="bar-label"><span>HEAP COMPACTION</span><span id="heapVal">1.8G / 4.0G</span></div>
+        <div class="bar-bg"><div class="bar-fill" id="heapBar" style="width: 45%;"></div></div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-label"><span>CHOREOGRAPHY STACK</span><span id="stackVal">12 THREADS</span></div>
+        <div class="bar-bg"><div class="bar-fill" id="stackBar" style="width: 75%; background: linear-gradient(90deg, var(--cyan), var(--cyan-bright));"></div></div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-label"><span>MEMORY STORE SYNC</span><span id="memVal">960B (100%)</span></div>
+        <div class="bar-bg"><div class="bar-fill" id="memBar" style="width: 100%;"></div></div>
+      </div>
+    </div>
+
+    <div class="gesture-triggers">
+      <button class="gesture-btn" id="btnChoreograph">1. Choreograph</button>
+      <button class="gesture-btn" id="btnCompact">2. Compact Heap</button>
+      <button class="gesture-btn" id="btnTrain">3. Train Epoch</button>
+      <button class="gesture-btn" id="btnDream">4. Idle Dream</button>
+    </div>
+  </div>
+
+  <!-- Center: Holo-Deck (Hand Tracking + Fiber Glow) -->
+  <div class="stage-container">
+    <video id="webcam" autoplay playsinline muted></video>
+    <canvas id="hudCanvas"></canvas>
+    <div class="hud-guide-text" id="guideText">
+      🖐️ MOVE MOUSE / TOUCH TO CONTROL HAND &bull; CLICK / PINCH TO TRIGGER AGENT
+    </div>
+  </div>
+
+  <!-- Right: Sci-Fi Terminal HUD -->
+  <div class="terminal-panel">
+    <div class="term-titlebar">
+      <span>agent --watch (live choreography)</span>
+      <div class="term-dots">
+        <div class="term-dot"></div>
+        <div class="term-dot"></div>
+      </div>
+    </div>
+    <div class="term-log" id="termLog">
+      <div class="log-line cmd">&gt; agent --watch</div>
+      <div class="log-line ok">[ok] hand tracked agent C03NJU7S</div>
+      <div class="log-line lifting">status: idle (awaiting instruction)</div>
+      <div class="log-line idea">IDEA 11: task queue as choreography</div>
+      <div class="log-line">running world_indexer</div>
+      <div class="log-line">running string_solver</div>
+      <div class="log-line ok">running gesture_compiler****** ok</div>
+      <div class="log-line idea">IDEA 12: puppets that dream when idle</div>
+      <div class="log-line lifting">lifting: migrate memory store (960B)</div>
+      <div class="log-line done">done : 960B in 2.3s</div>
+      <div class="log-line lifting">lifting: compact heap (1.8G)</div>
+      <div class="log-line done">done : 1.8G in 1.5s</div>
+      <div class="log-line lifting">lifting: train epoch 12/48 (512 batches)</div>
+      <div class="log-line done">done : 512 batches in 5.2s</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-left">
+      <button class="footer-btn" id="btnCamToggle">📹 ENABLE WEBCAM</button>
+      <button class="footer-btn" id="btnAudioToggle">🔊 AUDIO: ON</button>
+      <button class="footer-btn" id="btnAutoDemo">⚡ AUTO-CHOREOGRAPHY</button>
+    </div>
+    <div style="color: var(--text-muted); font-size: 10px;">
+      SYSTEM: KLLC-AGENTIC-CORE // CODECRAFTERS AR CONCEPT REPLICA
+    </div>
+  </footer>
+</div>
+
+<script>
+  /* ==========================================================================
+     1. AUDIO SYNTHESIZER (Web Audio API - Zero External Files)
+     ========================================================================== */
+  class CyberAudio {
+    constructor() {
+      this.enabled = true;
+      this.ctx = null;
+    }
+    init() {
+      if (!this.ctx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) this.ctx = new AudioCtx();
+      }
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+    }
+    beep(freq = 880, duration = 0.08, type = 'sine', gain = 0.1) {
+      if (!this.enabled) return;
+      this.init();
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      g.gain.setValueAtTime(gain, this.ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+      osc.connect(g);
+      g.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + duration);
+    }
+    pinchSound() {
+      if (!this.enabled) return;
+      this.init();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
+      g.gain.setValueAtTime(0.12, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.connect(g);
+      g.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(now + 0.15);
+    }
+    taskDoneSound() {
+      if (!this.enabled) return;
+      this.beep(587, 0.06, 'sine', 0.08);
+      setTimeout(() => this.beep(880, 0.1, 'sine', 0.1), 60);
+    }
+  }
+  const audio = new CyberAudio();
+
+  /* ==========================================================================
+     2. TERMINAL LOG SYSTEM
+     ========================================================================== */
+  const termLog = document.getElementById('termLog');
+  const agentStatus = document.getElementById('agentStatus');
+  const heapBar = document.getElementById('heapBar');
+  const heapVal = document.getElementById('heapVal');
+  const stackBar = document.getElementById('stackBar');
+
+  function addLog(text, type = '') {
+    const line = document.createElement('div');
+    line.className = `log-line ${type}`;
+    line.textContent = text;
+    termLog.appendChild(line);
+    termLog.scrollTop = termLog.scrollHeight;
+  }
+
+  function runAgentTask(name, detail = '') {
+    audio.pinchSound();
+    agentStatus.textContent = 'EXECUTING';
+    agentStatus.style.borderColor = 'var(--cyan)';
+    agentStatus.style.color = 'var(--cyan-bright)';
+
+    addLog(`> trigger [gesture]: ${name}`, 'cmd');
+    if (detail) addLog(`lifting: ${detail}`, 'lifting');
+
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += 25;
+      if (progress >= 100) {
+        clearInterval(interval);
+        addLog(`done : ${name} executed successfully`, 'done');
+        audio.taskDoneSound();
+        agentStatus.textContent = 'IDLE';
+        agentStatus.style.borderColor = 'var(--amber)';
+        agentStatus.style.color = 'var(--amber-bright)';
+
+        // Update gauges dynamically
+        const newHeap = (Math.random() * 2 + 1).toFixed(1);
+        heapVal.textContent = `${newHeap}G / 4.0G`;
+        heapBar.style.width = `${(newHeap / 4.0) * 100}%`;
+      }
+    }, 180);
+  }
+
+  document.getElementById('btnChoreograph').addEventListener('click', () => {
+    runAgentTask('choreography.expand()', 're-allocating agent sub-trees');
+  });
+  document.getElementById('btnCompact').addEventListener('click', () => {
+    runAgentTask('compact_heap()', 'reclaiming unused pointer cells (1.8G)');
+  });
+  document.getElementById('btnTrain').addEventListener('click', () => {
+    runAgentTask('train_epoch()', 'running epoch 13/48 (512 batches)');
+  });
+  document.getElementById('btnDream').addEventListener('click', () => {
+    runAgentTask('idle_dream()', 'dreaming state vector synthesis in memory store');
+  });
+
+  /* ==========================================================================
+     3. 3D HOLOGRAPHIC MECH AVATAR (Wireframe Hologram on Canvas)
+     ========================================================================== */
+  const mechCanvas = document.getElementById('mechCanvas');
+  const mctx = mechCanvas.getContext('2d');
+  let mechAngle = 0;
+
+  function resizeMech() {
+    mechCanvas.width = mechCanvas.clientWidth * window.devicePixelRatio;
+    mechCanvas.height = mechCanvas.clientHeight * window.devicePixelRatio;
+  }
+  window.addEventListener('resize', resizeMech);
+  resizeMech();
+
+  // Procedural 3D Robot / Mech Wireframe Vertices & Edges
+  const mechNodes = [
+    // Head / Visor
+    {x: -15, y: -50, z: -10}, {x: 15, y: -50, z: -10}, {x: 15, y: -30, z: -10}, {x: -15, y: -30, z: -10},
+    {x: -10, y: -50, z: 10},  {x: 10, y: -50, z: 10},  {x: 10, y: -30, z: 10},  {x: -10, y: -30, z: 10},
+    // Torso / Chest
+    {x: -35, y: -25, z: -15}, {x: 35, y: -25, z: -15}, {x: 25, y: 25, z: -15}, {x: -25, y: 25, z: -15},
+    {x: -30, y: -25, z: 15},  {x: 30, y: -25, z: 15},  {x: 20, y: 25, z: 15},  {x: -20, y: 25, z: 15},
+    // Shoulders
+    {x: -55, y: -20, z: 0},   {x: 55, y: -20, z: 0},
+    // Arms / Elbows
+    {x: -60, y: 15, z: -5},   {x: 60, y: 15, z: -5},
+    // Core Reactor Center
+    {x: 0, y: 0, z: 0}
+  ];
+
+  const mechEdges = [
+    // Visor Box
+    [0,1], [1,2], [2,3], [3,0],
+    [4,5], [5,6], [6,7], [7,4],
+    [0,4], [1,5], [2,6], [3,7],
+    // Torso Box
+    [8,9], [9,10], [10,11], [11,8],
+    [12,13], [13,14], [14,15], [15,12],
+    [8,12], [9,13], [10,14], [11,15],
+    // Connect Head to Torso
+    [3,8], [2,9],
+    // Shoulder joints
+    [8,16], [9,17], [16,18], [17,19],
+    // Core connector
+    [20, 8], [20, 9], [20, 10], [20, 11]
+  ];
+
+  function drawMech() {
+    mctx.clearRect(0, 0, mechCanvas.width, mechCanvas.height);
+    const cx = mechCanvas.width / 2;
+    const cy = mechCanvas.height / 2 + 10;
+    const scale = 1.3 * (mechCanvas.width / 300);
+
+    mechAngle += 0.015;
+    const cosA = Math.cos(mechAngle);
+    const sinA = Math.sin(mechAngle);
+
+    // Project nodes
+    const projected = mechNodes.map(n => {
+      // Rotate Y
+      const rx = n.x * cosA - n.z * sinA;
+      const rz = n.x * sinA + n.z * cosA + 160;
+      // Perspective
+      const fov = 200 / rz;
+      return {
+        x: cx + rx * scale * fov,
+        y: cy + n.y * scale * fov,
+        z: rz
+      };
+    });
+
+    // Draw Holo Wireframe Edges
+    mctx.strokeStyle = '#f59e0b';
+    mctx.lineWidth = 1.2;
+    mctx.shadowColor = 'rgba(245, 158, 11, 0.8)';
+    mctx.shadowBlur = 6;
+
+    mechEdges.forEach(([i, j]) => {
+      mctx.beginPath();
+      mctx.moveTo(projected[i].x, projected[i].y);
+      mctx.lineTo(projected[j].x, projected[j].y);
+      mctx.stroke();
+    });
+
+    // Draw Core glowing orb
+    const core = projected[20];
+    mctx.fillStyle = '#22d3ee';
+    mctx.shadowColor = '#06b6d4';
+    mctx.shadowBlur = 12;
+    mctx.beginPath();
+    mctx.arc(core.x, core.y, 4.5, 0, Math.PI * 2);
+    mctx.fill();
+
+    // Scanline across mech
+    const scanY = (Date.now() / 20) % mechCanvas.height;
+    mctx.strokeStyle = 'rgba(34, 211, 238, 0.4)';
+    mctx.lineWidth = 2;
+    mctx.beginPath();
+    mctx.moveTo(0, scanY);
+    mctx.lineTo(mechCanvas.width, scanY);
+    mctx.stroke();
+
+    requestAnimationFrame(drawMech);
+  }
+  drawMech();
+
+  /* ==========================================================================
+     4. CENTER STAGE: HAND TRACKING & FIBER THREADS ENGINE
+     ========================================================================== */
+  const canvas = document.getElementById('hudCanvas');
+  const ctx = canvas.getContext('2d');
+  const webcam = document.getElementById('webcam');
+  const guideText = document.getElementById('guideText');
+
+  function resizeStage() {
+    canvas.width = canvas.parentElement.clientWidth;
+    canvas.height = canvas.parentElement.clientHeight;
+  }
+  window.addEventListener('resize', resizeStage);
+  resizeStage();
+
+  // Hand state (virtual / mouse or camera)
+  let hand = {
+    wrist: { x: 0, y: 0 },
+    fingers: [
+      { name: 'Thumb', x: 0, y: 0, targetX: 0, targetY: 0 },
+      { name: 'Index', x: 0, y: 0, targetX: 0, targetY: 0 },
+      { name: 'Middle', x: 0, y: 0, targetX: 0, targetY: 0 },
+      { name: 'Ring', x: 0, y: 0, targetX: 0, targetY: 0 },
+      { name: 'Pinky', x: 0, y: 0, targetX: 0, targetY: 0 }
+    ],
+    isPinching: false,
+    pinchDist: 100,
+    active: true
+  };
+
+  let mouse = {
+    x: canvas.width * 0.5,
+    y: canvas.height * 0.45,
+    isDown: false
+  };
+
+  // Particles that burst from fingertips
+  const particles = [];
+  function spawnSparks(x, y, count = 8, color = '#fbbf24') {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 4 + 1;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        alpha: 1,
+        color,
+        size: Math.random() * 2.5 + 1
+      });
+    }
+  }
+
+  // Mouse / Touch handlers for virtual hand
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    mouse.isDown = true;
+    audio.pinchSound();
+    runAgentTask('pointer.lift()', 'choreography queue lock');
+    spawnSparks(hand.fingers[1].x, hand.fingers[1].y, 16, '#22d3ee');
+  });
+
+  window.addEventListener('mouseup', () => {
+    mouse.isDown = false;
+  });
+
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = touch.clientX - rect.left;
+    mouse.y = touch.clientY - rect.top;
+  }, { passive: false });
+
+  canvas.addEventListener('touchstart', (e) => {
+    mouse.isDown = true;
+    audio.pinchSound();
+  });
+
+  canvas.addEventListener('touchend', () => {
+    mouse.isDown = false;
+  });
+
+  // Calculate realistic hand kinematics from control point
+  function updateHandKinematics() {
+    const t = Date.now() * 0.002;
+    const mx = mouse.x;
+    const my = mouse.y;
+
+    // Wrist follows below hand
+    hand.wrist.x = mx + Math.sin(t * 0.5) * 15;
+    hand.wrist.y = canvas.height * 0.92;
+
+    // Finger offsets relative to palm
+    const pinchOffset = mouse.isDown ? 0.2 : 1.0;
+
+    const fingerConfig = [
+      { ox: -65 * pinchOffset, oy: -15, length: 70 }, // Thumb
+      { ox: -30 * pinchOffset, oy: -80, length: 110 }, // Index
+      { ox: 5,   oy: -100, length: 130 },             // Middle
+      { ox: 40,  oy: -85, length: 115 },              // Ring
+      { ox: 75,  oy: -55, length: 85 }                // Pinky
+    ];
+
+    fingerConfig.forEach((cfg, idx) => {
+      const f = hand.fingers[idx];
+      // subtle idle breathing wave
+      const wave = Math.sin(t + idx * 0.7) * 4;
+      const targetX = mx + cfg.ox + wave;
+      const targetY = my + cfg.oy + (wave * 0.5);
+
+      // Smooth interpolation
+      f.x += (targetX - f.x) * 0.35;
+      f.y += (targetY - f.y) * 0.35;
+    });
+
+    // Check pinch distance (Thumb vs Index)
+    const dx = hand.fingers[0].x - hand.fingers[1].x;
+    const dy = hand.fingers[0].y - hand.fingers[1].y;
+    hand.pinchDist = Math.hypot(dx, dy);
+    hand.isPinching = mouse.isDown || hand.pinchDist < 30;
+  }
+
+  // Draw Sci-Fi HUD on canvas
+  function renderHUD() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    updateHandKinematics();
+
+    const t = Date.now() * 0.003;
+
+    // 1. Draw glowing fiber cables (energy threads) from wrist to fingertips
+    hand.fingers.forEach((finger, i) => {
+      const wx = hand.wrist.x + (i - 2) * 18;
+      const wy = hand.wrist.y;
+      const fx = finger.x;
+      const fy = finger.y;
+
+      // Draw multiple fiber strands for volumetric fiber-optic cable look
+      const strands = 3;
+      for (let s = 0; s < strands; s++) {
+        const offset = (s - 1) * 3;
+        const cp1x = wx + (fx - wx) * 0.2 + Math.sin(t + i + s) * 20;
+        const cp1y = wy - (wy - fy) * 0.3;
+        const cp2x = fx + Math.cos(t * 0.8 + i) * 15;
+        const cp2y = fy + (wy - fy) * 0.25;
+
+        ctx.beginPath();
+        ctx.moveTo(wx + offset, wy);
+        ctx.bezierCurveTo(cp1x + offset, cp1y, cp2x + offset, cp2y, fx, fy);
+
+        // Gradient for threads
+        const grad = ctx.createLinearGradient(wx, wy, fx, fy);
+        grad.addColorStop(0, 'rgba(245, 158, 11, 0.15)');
+        grad.addColorStop(0.7, 'rgba(251, 191, 36, 0.85)');
+        grad.addColorStop(1, '#ffffff');
+
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = s === 1 ? 2.5 : 1.2;
+        ctx.shadowColor = '#f59e0b';
+        ctx.shadowBlur = s === 1 ? 14 : 6;
+        ctx.stroke();
+      }
+    });
+
+    // 2. Connecting webbing / choreography matrix between fingers
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(6, 182, 212, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < hand.fingers.length - 1; i++) {
+      ctx.moveTo(hand.fingers[i].x, hand.fingers[i].y);
+      ctx.lineTo(hand.fingers[i + 1].x, hand.fingers[i + 1].y);
+    }
+    ctx.stroke();
+
+    // 3. Fingertip Nodes (Glowing White/Amber Spheres + Reticles)
+    hand.fingers.forEach((finger, i) => {
+      const isIndex = i === 1;
+      const isThumb = i === 0;
+
+      // Node ring
+      ctx.beginPath();
+      ctx.arc(finger.x, finger.y, 10, 0, Math.PI * 2);
+      ctx.strokeStyle = isIndex && hand.isPinching ? '#22d3ee' : '#f59e0b';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = ctx.strokeStyle;
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+
+      // Core bright dot
+      ctx.beginPath();
+      ctx.arc(finger.x, finger.y, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowBlur = 15;
+      ctx.fill();
+
+      // Crosshair tick marks
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = 1;
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.moveTo(finger.x - 14, finger.y); ctx.lineTo(finger.x - 8, finger.y);
+      ctx.moveTo(finger.x + 8, finger.y); ctx.lineTo(finger.x + 14, finger.y);
+      ctx.moveTo(finger.x, finger.y - 14); ctx.lineTo(finger.x, finger.y - 8);
+      ctx.moveTo(finger.x, finger.y + 8); ctx.lineTo(finger.x, finger.y + 14);
+      ctx.stroke();
+
+      // Coordinates text overlay
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.7)';
+      ctx.font = '9px "JetBrains Mono"';
+      ctx.fillText(`${finger.name.toUpperCase()} [${Math.round(finger.x)}, ${Math.round(finger.y)}]`, finger.x + 14, finger.y - 6);
+    });
+
+    // 4. Pinch Proximity Arc (Thumb to Index)
+    if (hand.pinchDist < 120) {
+      const midX = (hand.fingers[0].x + hand.fingers[1].x) / 2;
+      const midY = (hand.fingers[0].y + hand.fingers[1].y) / 2;
+
+      ctx.beginPath();
+      ctx.moveTo(hand.fingers[0].x, hand.fingers[0].y);
+      ctx.lineTo(hand.fingers[1].x, hand.fingers[1].y);
+      ctx.strokeStyle = hand.isPinching ? '#22d3ee' : 'rgba(245, 158, 11, 0.6)';
+      ctx.lineWidth = hand.isPinching ? 3 : 1.5;
+      ctx.shadowColor = hand.isPinching ? '#06b6d4' : '#f59e0b';
+      ctx.shadowBlur = 12;
+      ctx.stroke();
+
+      // Pinch indicator badge
+      ctx.fillStyle = hand.isPinching ? '#22d3ee' : '#f59e0b';
+      ctx.font = '10px "JetBrains Mono"';
+      ctx.fillText(hand.isPinching ? '[PINCH TRIGGERED]' : `PINCH: ${Math.round(hand.pinchDist)}px`, midX + 10, midY - 10);
+    }
+
+    // 5. Render Particle Sparks
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.alpha -= 0.03;
+      if (p.alpha <= 0) {
+        particles.splice(i, 1);
+        continue;
+      }
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.alpha;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+
+    // 6. Sci-Fi Floating HUD Grid / Target Frame
+    const boxW = 280;
+    const boxH = 220;
+    const boxX = mouse.x - boxW / 2;
+    const boxY = mouse.y - boxH / 2 - 30;
+
+    ctx.strokeStyle = 'rgba(6, 182, 212, 0.2)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+    // Corner brackets
+    const cLen = 14;
+    ctx.strokeStyle = '#22d3ee';
+    ctx.lineWidth = 2;
+    // Top-Left
+    ctx.beginPath(); ctx.moveTo(boxX, boxY + cLen); ctx.lineTo(boxX, boxY); ctx.lineTo(boxX + cLen, boxY); ctx.stroke();
+    // Top-Right
+    ctx.beginPath(); ctx.moveTo(boxX + boxW - cLen, boxY); ctx.lineTo(boxX + boxW); ctx.lineTo(boxX + boxW, boxY + cLen); ctx.stroke();
+    // Bottom-Left
+    ctx.beginPath(); ctx.moveTo(boxX, boxY + boxH - cLen); ctx.lineTo(boxX, boxY + boxH); ctx.lineTo(boxX + cLen, boxY + boxH); ctx.stroke();
+    // Bottom-Right
+    ctx.beginPath(); ctx.moveTo(boxX + boxW - cLen, boxY + boxH); ctx.lineTo(boxX + boxW); ctx.lineTo(boxX + boxW, boxY + boxH - cLen); ctx.stroke();
+
+    requestAnimationFrame(renderHUD);
+  }
+  renderHUD();
+
+  /* ==========================================================================
+     5. CONTROLS & WEBCAM INTEGRATION
+     ========================================================================== */
+  const btnCamToggle = document.getElementById('btnCamToggle');
+  const btnAudioToggle = document.getElementById('btnAudioToggle');
+  const btnAutoDemo = document.getElementById('btnAutoDemo');
+  const trackingModeDisplay = document.getElementById('trackingModeDisplay');
+
+  let webcamActive = false;
+  btnCamToggle.addEventListener('click', async () => {
+    if (!webcamActive) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 1280, height: 720, facingMode: 'user' }
+        });
+        webcam.srcObject = stream;
+        webcam.play();
+        webcamActive = true;
+        btnCamToggle.textContent = '🛑 STOP WEBCAM';
+        btnCamToggle.classList.add('active');
+        trackingModeDisplay.textContent = 'WEBCAM + VIRTUAL HUD';
+        guideText.textContent = '📹 WEBCAM ACTIVE &bull; MOUSE/HAND TRACKING ENGAGED';
+        addLog('> video stream attached: 1280x720 30fps', 'ok');
+      } catch (err) {
+        console.warn('Webcam access error:', err);
+        addLog('! webcam access denied or unavailable; continuing in virtual mode', 'cmd');
+        alert('Webcam permission was not granted or not available in this environment. Falling back to smooth virtual mouse tracking!');
+      }
+    } else {
+      if (webcam.srcObject) {
+        webcam.srcObject.getTracks().forEach(track => track.stop());
+        webcam.srcObject = null;
+      }
+      webcamActive = false;
+      btnCamToggle.textContent = '📹 ENABLE WEBCAM';
+      btnCamToggle.classList.remove('active');
+      trackingModeDisplay.textContent = 'VIRTUAL / MOUSE';
+      guideText.textContent = '🖐️ MOVE MOUSE / TOUCH TO CONTROL HAND • CLICK / PINCH TO TRIGGER AGENT';
+    }
+  });
+
+  btnAudioToggle.addEventListener('click', () => {
+    audio.enabled = !audio.enabled;
+    if (audio.enabled) {
+      audio.init();
+      audio.beep(880, 0.08);
+      btnAudioToggle.textContent = '🔊 AUDIO: ON';
+      btnAudioToggle.classList.remove('active');
+    } else {
+      btnAudioToggle.textContent = '🔇 AUDIO: MUTED';
+      btnAudioToggle.classList.add('active');
+    }
+  });
+
+  let autoDemoInterval = null;
+  btnAutoDemo.addEventListener('click', () => {
+    if (!autoDemoInterval) {
+      btnAutoDemo.classList.add('active');
+      btnAutoDemo.textContent = '⚡ DEMO RUNNING...';
+      addLog('> autonomous agent choreography initiated', 'idea');
+
+      let step = 0;
+      autoDemoInterval = setInterval(() => {
+        const tasks = [
+          () => runAgentTask('string_solver', 'optimizing ast tokens'),
+          () => runAgentTask('memory.compact()', '1.8G heap compacted in 1.2s'),
+          () => runAgentTask('gesture_compiler', 'hand tracked agent C03NJU7S'),
+          () => runAgentTask('choreography.step()', 'IDEA 12: puppets that dream when idle')
+        ];
+        tasks[step % tasks.length]();
+        step++;
+      }, 3500);
+    } else {
+      clearInterval(autoDemoInterval);
+      autoDemoInterval = null;
+      btnAutoDemo.classList.remove('active');
+      btnAutoDemo.textContent = '⚡ AUTO-CHOREOGRAPHY';
+      addLog('> autonomous demo paused', 'cmd');
+    }
+  });
+
+  // Random stat fluctuations for realism
+  setInterval(() => {
+    const lat = (Math.random() * 2 + 7.5).toFixed(1);
+    document.getElementById('latencyVal').textContent = `${lat}ms`;
+    const conf = (99.4 + Math.random() * 0.5).toFixed(1);
+    document.getElementById('confVal').textContent = `${conf}%`;
+  }, 2000);
+</script>
+
+</body>
+</html>
