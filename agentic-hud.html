@@ -745,11 +745,10 @@
   });
 
   /* ==========================================================================
-     3. 3D HOLOGRAPHIC MECH AVATAR
+     3. 3D HOLOGRAPHIC MECH PUPPET AVATAR (Interactive Robotics Engine)
      ========================================================================== */
   const mechCanvas = document.getElementById('mechCanvas');
   const mctx = mechCanvas.getContext('2d');
-  let mechAngle = 0;
 
   function resizeMech() {
     mechCanvas.width = mechCanvas.clientWidth * window.devicePixelRatio;
@@ -758,72 +757,234 @@
   window.addEventListener('resize', resizeMech);
   resizeMech();
 
-  const mechNodes = [
-    {x: -15, y: -50, z: -10}, {x: 15, y: -50, z: -10}, {x: 15, y: -30, z: -10}, {x: -15, y: -30, z: -10},
-    {x: -10, y: -50, z: 10},  {x: 10, y: -50, z: 10},  {x: 10, y: -30, z: 10},  {x: -10, y: -30, z: 10},
-    {x: -35, y: -25, z: -15}, {x: 35, y: -25, z: -15}, {x: 25, y: 25, z: -15}, {x: -25, y: 25, z: -15},
-    {x: -30, y: -25, z: 15},  {x: 30, y: -25, z: 15},  {x: 20, y: 25, z: 15},  {x: -20, y: 25, z: 15},
-    {x: -55, y: -20, z: 0},   {x: 55, y: -20, z: 0},
-    {x: -60, y: 15, z: -5},   {x: 60, y: 15, z: -5},
-    {x: 0, y: 0, z: 0}
-  ];
+  // Puppet Tracking State
+  const puppetState = {
+    targetYaw: 0,
+    targetPitch: 0,
+    yaw: 0,
+    pitch: 0,
+    armLift: 0,
+    targetArmLift: 0,
+    isPinching: false,
+    isFist: false,
+    handDetected: false,
+    pulseEnergy: 0,
+    dreamTimer: 0
+  };
 
-  const mechEdges = [
-    [0,1], [1,2], [2,3], [3,0],
-    [4,5], [5,6], [6,7], [7,4],
-    [0,4], [1,5], [2,6], [3,7],
-    [8,9], [9,10], [10,11], [11,8],
-    [12,13], [13,14], [14,15], [15,12],
-    [8,12], [9,13], [10,14], [11,15],
-    [3,8], [2,9],
-    [8,16], [9,17], [16,18], [17,19],
-    [20, 8], [20, 9], [20, 10], [20, 11]
-  ];
+  // 3D Point Projection Helper
+  function project3D(x, y, z, yaw, pitch, scale, cx, cy) {
+    const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
+    const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
+
+    // Rotate Y (Yaw)
+    const x1 = x * cosY - z * sinY;
+    const z1 = x * sinY + z * cosY;
+
+    // Rotate X (Pitch)
+    const y2 = y * cosP - z1 * sinP;
+    const z2 = y * sinP + z1 * cosP + 170;
+
+    const fov = 220 / z2;
+    return {
+      x: cx + x1 * scale * fov,
+      y: cy + y2 * scale * fov,
+      z: z2
+    };
+  }
+
+  // Draw 3D Shaded Polygon Face
+  function drawMechFace(pts, fillColor, strokeColor, lineWidth = 1) {
+    if (pts.length < 3) return;
+    mctx.beginPath();
+    mctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) {
+      mctx.lineTo(pts[i].x, pts[i].y);
+    }
+    mctx.closePath();
+    if (fillColor) {
+      mctx.fillStyle = fillColor;
+      mctx.fill();
+    }
+    if (strokeColor) {
+      mctx.strokeStyle = strokeColor;
+      mctx.lineWidth = lineWidth;
+      mctx.stroke();
+    }
+  }
 
   function drawMech() {
     mctx.clearRect(0, 0, mechCanvas.width, mechCanvas.height);
     const cx = mechCanvas.width / 2;
-    const cy = mechCanvas.height / 2 + 10;
-    const scale = 1.3 * (mechCanvas.width / 300);
+    const cy = mechCanvas.height / 2 + 15;
+    const scale = 1.35 * (mechCanvas.width / 320);
+    const now = performance.now() * 0.001;
 
-    mechAngle += 0.015;
-    const cosA = Math.cos(mechAngle);
-    const sinA = Math.sin(mechAngle);
+    // Smooth Damping to Target Hand/Mouse Movement
+    const damp = 0.12;
+    if (puppetState.handDetected) {
+      puppetState.yaw += (puppetState.targetYaw - puppetState.yaw) * damp;
+      puppetState.pitch += (puppetState.targetPitch - puppetState.pitch) * damp;
+      puppetState.armLift += (puppetState.targetArmLift - puppetState.armLift) * damp;
+      puppetState.dreamTimer = 0;
+    } else {
+      // Idle Dreaming Mode (breathing, curious looking around)
+      puppetState.dreamTimer += 0.016;
+      puppetState.yaw += (Math.sin(now * 0.7) * 0.35 - puppetState.yaw) * 0.05;
+      puppetState.pitch += (Math.sin(now * 1.1) * 0.15 - puppetState.pitch) * 0.05;
+      puppetState.armLift += (0 - puppetState.armLift) * 0.05;
+    }
 
-    const projected = mechNodes.map(n => {
-      const rx = n.x * cosA - n.z * sinA;
-      const rz = n.x * sinA + n.z * cosA + 160;
-      const fov = 200 / rz;
-      return {
-        x: cx + rx * scale * fov,
-        y: cy + n.y * scale * fov,
-        z: rz
-      };
-    });
+    if (puppetState.pulseEnergy > 0) {
+      puppetState.pulseEnergy = Math.max(0, puppetState.pulseEnergy - 0.04);
+    }
 
-    mctx.strokeStyle = '#f59e0b';
-    mctx.lineWidth = 1.2;
-    mctx.shadowColor = 'rgba(245, 158, 11, 0.8)';
-    mctx.shadowBlur = 6;
+    const yaw = puppetState.yaw;
+    const pitch = puppetState.pitch;
+    const breath = Math.sin(now * 2.5) * 2;
+    const armLift = puppetState.armLift;
 
-    mechEdges.forEach(([i, j]) => {
+    // 1. Holographic Floor Pedestal Rings
+    mctx.save();
+    for (let r = 1; r <= 2; r++) {
+      const radius = r * 38;
+      const rotRing = now * (r === 1 ? 0.8 : -0.5);
       mctx.beginPath();
-      mctx.moveTo(projected[i].x, projected[i].y);
-      mctx.lineTo(projected[j].x, projected[j].y);
+      for (let a = 0; a <= Math.PI * 2; a += 0.2) {
+        const p = project3D(Math.cos(a + rotRing) * radius, 65, Math.sin(a + rotRing) * radius, yaw * 0.2, pitch * 0.2, scale, cx, cy);
+        if (a === 0) mctx.moveTo(p.x, p.y);
+        else mctx.lineTo(p.x, p.y);
+      }
+      mctx.closePath();
+      mctx.strokeStyle = r === 1 ? 'rgba(245, 158, 11, 0.4)' : 'rgba(34, 211, 238, 0.35)';
+      mctx.lineWidth = 1;
       mctx.stroke();
-    });
+    }
+    mctx.restore();
 
-    const core = projected[20];
-    mctx.fillStyle = '#22d3ee';
-    mctx.shadowColor = '#06b6d4';
-    mctx.shadowBlur = 12;
+    // 2. Torso / Chest Armor Geometry
+    const torsoY = 0 + breath * 0.5;
+    const tBox = [
+      [-26, torsoY - 26, -14], [26, torsoY - 26, -14], [20, torsoY + 22, -12], [-20, torsoY + 22, -12],
+      [-24, torsoY - 26, 14],  [24, torsoY - 26, 14],  [18, torsoY + 22, 12],  [-18, torsoY + 22, 12]
+    ].map(pt => project3D(pt[0], pt[1], pt[2], yaw * 0.7, pitch * 0.6, scale, cx, cy));
+
+    const armorFill = puppetState.isPinching ? 'rgba(6, 182, 212, 0.25)' : 'rgba(245, 158, 11, 0.16)';
+    const armorStroke = puppetState.isPinching ? '#22d3ee' : '#f59e0b';
+
+    // Front Chest
+    drawMechFace([tBox[0], tBox[1], tBox[2], tBox[3]], armorFill, armorStroke, 1.4);
+    // Left Flank
+    drawMechFace([tBox[0], tBox[3], tBox[7], tBox[4]], 'rgba(245, 158, 11, 0.08)', armorStroke, 1);
+    // Right Flank
+    drawMechFace([tBox[1], tBox[2], tBox[6], tBox[5]], 'rgba(245, 158, 11, 0.08)', armorStroke, 1);
+
+    // 3. Glowing Arc Reactor Core (Center of Chest)
+    const corePos = project3D(0, torsoY, -14, yaw * 0.7, pitch * 0.6, scale, cx, cy);
+    const coreGlow = puppetState.pulseEnergy > 0 ? 16 + puppetState.pulseEnergy * 14 : 10;
     mctx.beginPath();
-    mctx.arc(core.x, core.y, 4.5, 0, Math.PI * 2);
+    mctx.arc(corePos.x, corePos.y, 6 + puppetState.pulseEnergy * 3, 0, Math.PI * 2);
+    mctx.fillStyle = puppetState.isPinching ? '#ffffff' : '#22d3ee';
+    mctx.shadowColor = '#06b6d4';
+    mctx.shadowBlur = coreGlow;
     mctx.fill();
 
-    const scanY = (Date.now() / 20) % mechCanvas.height;
-    mctx.strokeStyle = 'rgba(34, 211, 238, 0.4)';
-    mctx.lineWidth = 2;
+    mctx.beginPath();
+    mctx.arc(corePos.x, corePos.y, 11, 0, Math.PI * 2);
+    mctx.strokeStyle = 'rgba(34, 211, 238, 0.7)';
+    mctx.lineWidth = 1.2;
+    mctx.stroke();
+
+    // 4. Head & Helmet (Yaw & Pitch follows hand actively)
+    const headYaw = yaw * 1.1;
+    const headPitch = pitch * 1.1;
+    const headCenterY = torsoY - 42;
+
+    const hNodes = [
+      [-16, headCenterY - 14, -13], [16, headCenterY - 14, -13], [14, headCenterY + 8, -12], [-14, headCenterY + 8, -12],
+      [-14, headCenterY - 14, 12],  [14, headCenterY - 14, 12],  [12, headCenterY + 8, 11],  [-12, headCenterY + 8, 11],
+      [-22, headCenterY - 24, 0],   [22, headCenterY - 24, 0],
+      [0, headCenterY - 2, -14]
+    ].map(pt => project3D(pt[0], pt[1], pt[2], headYaw, headPitch, scale, cx, cy));
+
+    drawMechFace([hNodes[0], hNodes[1], hNodes[2], hNodes[3]], 'rgba(245, 158, 11, 0.22)', armorStroke, 1.4);
+    drawMechFace([hNodes[0], hNodes[3], hNodes[7], hNodes[4]], 'rgba(245, 158, 11, 0.1)', armorStroke, 1);
+    drawMechFace([hNodes[1], hNodes[2], hNodes[6], hNodes[5]], 'rgba(245, 158, 11, 0.1)', armorStroke, 1);
+
+    // Antennae Rods
+    mctx.beginPath();
+    mctx.moveTo(hNodes[0].x, hNodes[0].y); mctx.lineTo(hNodes[8].x, hNodes[8].y);
+    mctx.moveTo(hNodes[1].x, hNodes[1].y); mctx.lineTo(hNodes[9].x, hNodes[9].y);
+    mctx.strokeStyle = '#22d3ee';
+    mctx.lineWidth = 1.8;
+    mctx.stroke();
+
+    // Glowing Cyber Visor
+    const visorP1 = project3D(-11, headCenterY - 2, -13.5, headYaw, headPitch, scale, cx, cy);
+    const visorP2 = project3D(11, headCenterY - 2, -13.5, headYaw, headPitch, scale, cx, cy);
+    mctx.beginPath();
+    mctx.moveTo(visorP1.x, visorP1.y);
+    mctx.lineTo(visorP2.x, visorP2.y);
+    mctx.strokeStyle = puppetState.isPinching ? '#ffffff' : '#22d3ee';
+    mctx.lineWidth = 3.5;
+    mctx.shadowColor = '#06b6d4';
+    mctx.shadowBlur = 12;
+    mctx.stroke();
+
+    // 5. Articulated Left Arm
+    const lShoulder = project3D(-34, torsoY - 20, 0, yaw * 0.7, pitch * 0.6, scale, cx, cy);
+    const lElbow = project3D(-42, torsoY + 8, -8, yaw * 0.7, pitch * 0.6, scale, cx, cy);
+    const lHand = project3D(puppetState.isFist ? -25 : -36, torsoY + 30, puppetState.isFist ? -16 : 0, yaw * 0.7, pitch * 0.6, scale, cx, cy);
+
+    mctx.beginPath();
+    mctx.moveTo(lShoulder.x, lShoulder.y);
+    mctx.lineTo(lElbow.x, lElbow.y);
+    mctx.lineTo(lHand.x, lHand.y);
+    mctx.strokeStyle = armorStroke;
+    mctx.lineWidth = 3;
+    mctx.shadowBlur = 4;
+    mctx.stroke();
+
+    // 6. Articulated Right Arm (Reacts dynamically to user hand)
+    const rShoulder = project3D(34, torsoY - 20, 0, yaw * 0.7, pitch * 0.6, scale, cx, cy);
+    const rElbowY = torsoY + 10 - armLift * 30;
+    const rElbowZ = -10 - armLift * 15;
+    const rHandY = torsoY + 28 - armLift * 55;
+    const rHandZ = -8 - armLift * 35;
+    const rHandX = puppetState.isFist ? 22 : (36 + (puppetState.isPinching ? -10 : 0));
+
+    const rElbow = project3D(42, rElbowY, rElbowZ, yaw * 0.8, pitch * 0.7, scale, cx, cy);
+    const rHand = project3D(rHandX, rHandY, rHandZ, yaw * 0.9, pitch * 0.8, scale, cx, cy);
+
+    mctx.beginPath();
+    mctx.moveTo(rShoulder.x, rShoulder.y);
+    mctx.lineTo(rElbow.x, rElbow.y);
+    mctx.lineTo(rHand.x, rHand.y);
+    mctx.strokeStyle = puppetState.isPinching ? '#22d3ee' : '#fbbf24';
+    mctx.lineWidth = puppetState.isPinching ? 4 : 3;
+    mctx.shadowColor = mctx.strokeStyle;
+    mctx.shadowBlur = puppetState.isPinching ? 14 : 6;
+    mctx.stroke();
+
+    // Hand Claw
+    mctx.beginPath();
+    mctx.arc(rHand.x, rHand.y, puppetState.isPinching ? 6 : (puppetState.isFist ? 5 : 7), 0, Math.PI * 2);
+    mctx.fillStyle = puppetState.isPinching ? '#22d3ee' : '#fbbf24';
+    mctx.fill();
+
+    // 7. Telemetry Overlay inside Mech Box
+    mctx.save();
+    mctx.font = '9px "JetBrains Mono"';
+    mctx.fillStyle = puppetState.handDetected ? '#22d3ee' : '#f59e0b';
+    mctx.fillText(puppetState.handDetected ? '● PUPPET LINK: ACTIVE' : '○ PUPPET: IDLE DREAMING', 10, 18);
+    mctx.fillStyle = '#94a3b8';
+    mctx.fillText(`POSE: ${puppetState.isPinching ? 'PINCH LOCK' : (puppetState.isFist ? 'DEFENSE GUARD' : (puppetState.handDetected ? 'TRACKING' : 'IDLE'))}`, 10, 32);
+    mctx.restore();
+
+    // 8. Holographic Laser Scanline
+    const scanY = (Date.now() / 18) % mechCanvas.height;
+    mctx.strokeStyle = puppetState.isPinching ? 'rgba(34, 211, 238, 0.55)' : 'rgba(245, 158, 11, 0.4)';
+    mctx.lineWidth = 1.8;
     mctx.beginPath();
     mctx.moveTo(0, scanY);
     mctx.lineTo(mechCanvas.width, scanY);
@@ -1057,6 +1218,18 @@
       wrist = screenPoints[0];
       currentGesture = classifyGesture(rawLandmarks);
       handleGestureEvents(currentGesture, screenPoints);
+
+      // Feed into 3D Mech Puppet
+      const tip8 = screenPoints[8] || screenPoints[0];
+      const normX = tip8.x / canvas.width;
+      const normY = tip8.y / canvas.height;
+      puppetState.handDetected = true;
+      puppetState.targetYaw = (normX - 0.5) * 1.5;
+      puppetState.targetPitch = (normY - 0.5) * 0.9;
+      puppetState.targetArmLift = Math.max(0, Math.min(1.2, (canvas.height * 0.85 - tip8.y) / (canvas.height * 0.6)));
+      puppetState.isPinching = currentGesture === 'PINCH';
+      puppetState.isFist = currentGesture === 'FIST';
+      if (puppetState.isPinching) puppetState.pulseEnergy = 1.0;
     } else {
       const synth = getSyntheticLandmarks();
       screenPoints = synth.screenPoints;
@@ -1067,6 +1240,17 @@
       } else {
         gestureBadge.textContent = '[GESTURE: MOUSE TRACKED]';
       }
+
+      // Feed virtual mouse into 3D Mech Puppet
+      const normX = mouse.x / canvas.width;
+      const normY = mouse.y / canvas.height;
+      puppetState.handDetected = true;
+      puppetState.targetYaw = (normX - 0.5) * 1.5;
+      puppetState.targetPitch = (normY - 0.5) * 0.9;
+      puppetState.targetArmLift = Math.max(0, Math.min(1.2, (canvas.height * 0.85 - mouse.y) / (canvas.height * 0.6)));
+      puppetState.isPinching = mouse.isDown;
+      puppetState.isFist = false;
+      if (mouse.isDown) puppetState.pulseEnergy = 1.0;
     }
 
     // 1. Draw Skeleton Bones if enabled
