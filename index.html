@@ -596,6 +596,20 @@
       cam.gYaw = 0.28; cam.gPitch = 0.26; cam.gDist = 10.6; cam.gTx = 0; cam.gTy = 1.65;
     });
 
+    // Double-click on canvas to reset zoom / view
+    canvas.addEventListener('dblclick', () => {
+      closeInspector();
+      cam.gYaw = 0.28; cam.gPitch = 0.26; cam.gDist = 10.6; cam.gTx = 0; cam.gTy = 1.65;
+    });
+
+    // ESC or R key to reset zoom / close drawer
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape' || e.key === 'r' || e.key === 'R' || e.key === '0') {
+        closeInspector();
+        cam.gYaw = 0.28; cam.gPitch = 0.26; cam.gDist = 10.6; cam.gTx = 0; cam.gTy = 1.65;
+      }
+    });
+
     const linkPulses = LINKS.map((l, idx) => ({ ...l, t: idx * 0.2 }));
 
     let lastT = performance.now();
