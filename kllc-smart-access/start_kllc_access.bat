@@ -1,59 +1,97 @@
 @echo off
-chcp 65001 >nul
-title KLLC Smart Access Lite - สำนักการเรียนรู้ตลอดชีวิต สจล.
-cls
+title KLLC Smart Access Lite
+cd /d "%~dp0"
 
 echo ==============================================================================
-echo    KLLC SMART ACCESS LITE // ระบบตรวจจับและบันทึกประวัติการเข้า-ออกด้วยใบหน้า
-echo    Hikvision DeepinMind Pro (iDS-7716NXI-M4/X) ISAPI Integration
-echo    สำนักการเรียนรู้ตลอดชีวิต (KLLC) สถาบันเทคโนโลยีพระจอมเกล้าเจ้าคุณทหารลาดกระบัง
+echo    KLLC SMART ACCESS LITE
+echo    Hikvision DeepinMind Pro (iDS-7716NXI-M4/X) ISAPI Face Access System
 echo ==============================================================================
 echo.
 
-:: 1. Check Python
-where python >nul 2>nul
-if %errorlevel% neq 0 (
-    echo [ERROR] ไม่พบ Python ในระบบ กรุณาติดตั้ง Python 3.11 หรือสูงกว่าจาก python.org
-    echo [TIP] อย่าลืมติ๊กเลือก "Add Python to PATH" ระหว่างการติดตั้ง
+REM 1. Check if extracted properly (not running directly inside ZIP)
+if not exist "requirements.txt" (
+    echo [ERROR] Project files not found in this folder!
+    echo.
+    echo Please EXTRACT the ZIP file first:
+    echo   1. Right-click the downloaded .zip file
+    echo   2. Select "Extract All..."
+    echo   3. Open the extracted folder and double-click start_kllc_access.bat
+    echo.
     pause
     exit /b 1
 )
 
-:: 2. Check and copy .env
-if not exist ".env" (
-    echo [INFO] กำลังสร้างไฟล์ .env จาก .env.example...
-    copy .env.example .env >nul
-    echo [TIP] บอสสามารถแก้ไข IP และรหัสผ่าน NVR ได้ในไฟล์ .env
-    echo.
+REM 2. Detect real Python installation (avoid Windows Store stub)
+set "PY_CMD="
+py -3 --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set "PY_CMD=py -3"
+) else (
+    python --version >nul 2>&1
+    if %errorlevel% equ 0 (
+        set "PY_CMD=python"
+    )
 )
 
-:: 3. Setup Virtual Environment
-if not exist ".venv" (
-    echo [INFO] กำลังสร้าง Python Virtual Environment (.venv)...
-    python -m venv .venv
+if "%PY_CMD%"=="" (
+    echo [ERROR] Python is not installed on this computer.
+    echo.
+    echo Opening Python download page in your browser...
+    echo   1. Download and run the Python installer
+    echo   2. IMPORTANT: Check the box "Add python.exe to PATH" at the bottom
+    echo   3. Click "Install Now", then double-click start_kllc_access.bat again
+    echo.
+    start "" "https://www.python.org/downloads/"
+    pause
+    exit /b 1
+)
+
+echo [OK] Found Python:
+%PY_CMD% --version
+echo.
+
+REM 3. Create .env from .env.example if missing
+if not exist ".env" (
+    if exist ".env.example" (
+        echo [INFO] Creating initial .env configuration file...
+        copy ".env.example" ".env" >nul
+    )
+)
+
+REM 4. Create Virtual Environment (.venv) if missing
+if not exist ".venv\Scripts\python.exe" (
+    echo [INFO] Setting up Python environment for first-time use...
+    %PY_CMD% -m venv .venv
     if %errorlevel% neq 0 (
-        echo [ERROR] สร้าง venv ไม่สำเร็จ
+        echo [ERROR] Failed to create virtual environment.
         pause
         exit /b 1
     )
 )
 
-:: 4. Activate venv & Install dependencies
-echo [INFO] กำลังเรียกใช้งาน Python Virtual Environment...
-call .venv\Scripts\activate.bat
+REM 5. Install / verify required packages
+echo [INFO] Checking and installing required packages (please wait)...
+".venv\Scripts\python.exe" -m pip install --upgrade pip >nul 2>&1
+".venv\Scripts\python.exe" -m pip install -r requirements.txt
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Package installation failed. Please check your internet connection.
+    pause
+    exit /b 1
+)
 
-echo [INFO] ตรวจสอบและติดตั้ง Packages...
-pip install -r requirements.txt --quiet
-
-:: 5. Launch Browser & Server
+REM 6. Launch Browser & Start Server
 echo.
 echo ==============================================================================
-echo  [SUCCESS] กำลังเปิดระบบ KLLC Smart Access Lite ที่ http://localhost:8000
-echo  กด Ctrl+C ในหน้าต่างนี้เพื่อหยุดการทำงาน
+echo  [READY] Starting KLLC Smart Access Lite at http://localhost:8000
+echo  Keep this black window open while using the system.
+echo  Press Ctrl+C to stop.
 echo ==============================================================================
 echo.
 
-start "" http://localhost:8000
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+start "" "http://localhost:8000"
+".venv\Scripts\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
+echo.
+echo [INFO] Server stopped.
 pause
