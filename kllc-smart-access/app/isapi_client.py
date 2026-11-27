@@ -21,11 +21,18 @@ class HikvisionISAPIClient:
         self.nvr_user = NVR_USER
         self.nvr_pass = NVR_PASS
         self.base_url = NVR_BASE_URL.rstrip("/")
-        self.auth = httpx.DigestAuth(self.nvr_user, self.nvr_pass)
         self.is_connected = False
         self.device_info = {}
         self.running_stream_task: Optional[asyncio.Task] = None
         self._stop_event = asyncio.Event()
+        self._use_basic_auth = False
+        self._stream_id_cache: Dict[int, int] = {}
+
+    def _make_auth(self, force_basic: bool = False):
+        """Create a fresh auth instance per client (httpx.DigestAuth is NOT concurrency-safe when shared)."""
+        if force_basic or self._use_basic_auth:
+            return httpx.BasicAuth(self.nvr_user, self.nvr_pass)
+        return httpx.DigestAuth(self.nvr_user, self.nvr_pass)
 
     def update_credentials(self, ip: str, port: int, user: str, password: Optional[str] = None):
         """Update NVR connection credentials at runtime without restarting the server."""
@@ -35,12 +42,13 @@ class HikvisionISAPIClient:
         if password is not None and password != "":
             self.nvr_pass = password
         self.base_url = f"http://{self.nvr_ip}:{self.nvr_port}".rstrip("/")
-        self.auth = httpx.DigestAuth(self.nvr_user, self.nvr_pass)
         self.is_connected = False
+        self._use_basic_auth = False
+        self._stream_id_cache.clear()
 
-    async def _get_client(self, timeout: float = 10.0) -> httpx.AsyncClient:
+    async def _get_client(self, timeout: float = 10.0, force_basic: bool = False) -> httpx.AsyncClient:
         return httpx.AsyncClient(
-            auth=self.auth,
+            auth=self._make_auth(force_basic=force_basic),
             timeout=timeout,
             verify=False
         )
@@ -53,13 +61,18 @@ class HikvisionISAPIClient:
         return False
 
     async def get_device_info(self) -> Dict[str, Any]:
-        """Fetch NVR device info (GET /ISAPI/System/deviceInfo)."""
+        """Fetch NVR device info (GET /ISAPI/System/deviceInfo) with Digest -> Basic auth fallback."""
         endpoint = SAFE_ENDPOINTS["device_info"]
         url = f"{self.base_url}{endpoint}"
 
         try:
             async with await self._get_client(timeout=5.0) as client:
                 resp = await client.get(url)
+                if resp.status_code == 401 and "basic" in resp.headers.get("www-authenticate", "").lower():
+                    async with await self._get_client(timeout=5.0, force_basic=True) as basic_client:
+                        resp = await basic_client.get(url)
+                        if resp.status_code == 200:
+                            self._use_basic_auth = True
                 if resp.status_code == 200:
                     root = parse_xml_tree(resp.text)
                     if root is None:
@@ -248,9 +261,9 @@ class HikvisionISAPIClient:
         return None
 
     async def get_camera_live_picture(self, channel_id: int) -> Optional[bytes]:
-        """Fetch live JPEG snapshot for a camera channel (D1->102/101, D2->202/201, etc.) without saving to disk."""
-        # Prefer sub-stream (*02) for fast refresh, fallback to main stream (*01)
-        candidate_streams = [channel_id * 100 + 2, channel_id * 100 + 1]
+        """Fetch live JPEG snapshot for a camera channel (D1->102/101/1, D2->202/201/2, etc.) without saving to disk."""
+        cached = self._stream_id_cache.get(channel_id)
+        candidate_streams = [cached] if cached else [channel_id * 100 + 2, channel_id * 100 + 1, channel_id]
         try:
             async with await self._get_client(timeout=4.0) as client:
                 for stream_id in candidate_streams:
@@ -260,10 +273,31 @@ class HikvisionISAPIClient:
                     url = f"{self.base_url}{path}"
                     resp = await client.get(url)
                     if resp.status_code == 200 and resp.content and resp.content.startswith(b"\xff\xd8"):
+                        self._stream_id_cache[channel_id] = stream_id
                         return resp.content
+                # If cached stream stopped working, clear cache so next call re-probes
+                if cached:
+                    self._stream_id_cache.pop(channel_id, None)
         except Exception as e:
             logger.debug(f"Live picture unavailable for D{channel_id}: {e}")
         return None
+
+    async def run_diagnostics(self) -> Dict[str, Any]:
+        """Run 1-click end-to-end ISAPI connectivity diagnostics for troubleshooting."""
+        report = {
+            "nvr_url": self.base_url,
+            "nvr_user": self.nvr_user,
+            "auth_mode": "Basic" if self._use_basic_auth else "Digest",
+            "device_info": await self.get_device_info(),
+            "camera_d2_picture": False,
+            "face_libraries": []
+        }
+        if report["device_info"].get("status") == "online":
+            pic = await self.get_camera_live_picture(2)
+            report["camera_d2_picture"] = bool(pic)
+            libs = await self.get_face_libraries()
+            report["face_libraries"] = [l["name"] for l in libs]
+        return report
 
     async def start_alert_stream(
         self,
@@ -294,7 +328,7 @@ class HikvisionISAPIClient:
                     err_detail = f"HTTP {dev_info.get('code')}" if dev_info.get("code") else dev_info.get("error", "Auth/Network Error")
                     raise ConnectionError(f"NVR offline or unreachable: {err_detail}")
 
-                async with httpx.AsyncClient(auth=self.auth, timeout=None, verify=False) as client:
+                async with httpx.AsyncClient(auth=self._make_auth(), timeout=None, verify=False) as client:
                     async with client.stream("GET", url) as stream_resp:
                         if stream_resp.status_code != 200:
                             raise ConnectionError(f"alertStream returned HTTP {stream_resp.status_code}")

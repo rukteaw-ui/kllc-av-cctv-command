@@ -37,11 +37,11 @@ if "%PY_CMD%"=="" (
     echo [ERROR] Python is not installed on this computer.
     echo.
     echo Opening Python download page in your browser...
-    echo   1. Download and run the Python installer
-    echo   2. IMPORTANT: Check the box "Add python.exe to PATH" at the bottom
+    echo   1. Click "Download Windows installer (64-bit)" (.exe)
+    echo   2. IMPORTANT: Check "Add python.exe to PATH" at the bottom
     echo   3. Click "Install Now", then double-click start_kllc_access.bat again
     echo.
-    start "" "https://www.python.org/downloads/"
+    start "" "https://www.python.org/downloads/windows/"
     pause
     exit /b 1
 )
@@ -80,7 +80,13 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM 6. Launch Browser & Start Server
+REM 6. Free port 8000 if an older instance is still running
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":8000 " ^| findstr "LISTENING"') do (
+    echo [INFO] Stopping older KLLC Access server (PID %%a)...
+    taskkill /F /PID %%a >nul 2>&1
+)
+
+REM 7. Launch Browser (after 3s delay so server is ready) & Start Server
 echo.
 echo ==============================================================================
 echo  [READY] Starting KLLC Smart Access Lite at http://localhost:8000
@@ -89,7 +95,7 @@ echo  Press Ctrl+C to stop.
 echo ==============================================================================
 echo.
 
-start "" "http://localhost:8000"
+start /b cmd /c "timeout /t 3 /nobreak >nul & start http://localhost:8000"
 ".venv\Scripts\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 echo.

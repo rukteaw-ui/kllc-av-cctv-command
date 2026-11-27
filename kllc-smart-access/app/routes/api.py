@@ -446,3 +446,12 @@ async def update_nvr_settings(payload: NVRSettingsPayload, request: Request):
         "message": msg
     }
 
+@router.get("/diagnose")
+async def diagnose_nvr(request: Request):
+    """Run live ISAPI connectivity diagnostics (DeviceInfo, D2 Picture, FDLib)."""
+    isapi_client = getattr(request.app.state, "isapi_client", None)
+    if not isapi_client:
+        raise HTTPException(status_code=500, detail="ISAPI client unavailable")
+    return await isapi_client.run_diagnostics()
+
+
