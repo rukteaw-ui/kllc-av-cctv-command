@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KLLC Smart Access Lite // ระบบตรวจจับและบันทึกประวัติการเข้า-ออกด้วยใบหน้า</title>
+  <!-- Google Fonts: Noto Sans Thai & Space Grotesk -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+            },
+            kllc: {
+              orange: '#f97316',
+              cyan: '#06b6d4',
+              emerald: '#10b981',
+              dark: '#0b0f17',
+              panel: '#131b29',
+              border: '#1f2d42'
+            }
+          },
+          fontFamily: {
+            sans: ['"Noto Sans Thai"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+            display: ['"Space Grotesk"', '"Noto Sans Thai"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #080c14;
+      color: #e2e8f0;
+      font-family: 'Noto Sans Thai', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.2); opacity: 0.3; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .animate-pulse-ring {
+      animation: pulse-ring 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-white">
+
+  <!-- Top Navigation & System Status Bar -->
+  <header class="sticky top-0 z-50 bg-[#0c121d]/90 backdrop-blur-md border-b border-slate-800 px-4 lg:px-8 py-3">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-start">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-emerald-500 p-0.5 flex items-center justify-center shadow-lg shadow-cyan-950/50">
+            <div class="w-full h-full bg-[#0d1424] rounded-[10px] flex items-center justify-center">
+              <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-display font-bold text-lg tracking-wide text-white">KLLC SMART ACCESS</span>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/60">LITE</span>
+            </div>
+            <p class="text-xs text-slate-400">ระบบตรวจจับและบันทึกประวัติการเข้า-ออก • สำนักการเรียนรู้ตลอดชีวิต สจล.</p>
+          </div>
+        </div>
+
+        <!-- Mobile Menu Toggle or Time -->
+        <div class="md:hidden text-xs font-mono text-slate-400" id="clock-mobile">--:--:--</div>
+      </div>
+
+      <!-- Center Tabs -->
+      <nav class="flex items-center space-x-1 bg-[#131c2d] p-1 rounded-xl border border-slate-800">
+        <button id="tab-btn-live" onclick="switchTab('live')" class="tab-btn active px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 bg-gradient-to-r from-cyan-600 to-emerald-600 text-white shadow">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+          </span>
+          <span>ดูสดเรียลไทม์</span>
+        </button>
+        <button id="tab-btn-history" onclick="switchTab('history')" class="tab-btn px-4 py-1.5 rounded-lg text-sm font-medium transition-all text-slate-400 hover:text-white hover:bg-slate-800/60">
+          <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <span>ประวัติเข้า-ออก</span>
+        </button>
+        <button id="tab-btn-personnel" onclick="switchTab('personnel')" class="tab-btn px-4 py-1.5 rounded-lg text-sm font-medium transition-all text-slate-400 hover:text-white hover:bg-slate-800/60">
+          <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+          <span>คลังบุคลากร</span>
+        </button>
+      </nav>
+
+      <!-- Right: NVR Status Badge & Clock -->
+      <div class="hidden md:flex items-center space-x-4">
+        <!-- NVR Connection Pill -->
+        <div id="nvr-status-badge" class="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-xs">
+          <span id="nvr-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+          <span id="nvr-status-text" class="font-medium text-slate-300">กำลังเชื่อมต่อ NVR...</span>
+        </div>
+
+        <!-- Clock -->
+        <div class="text-right">
+          <div id="live-clock" class="font-mono text-sm font-bold text-cyan-400">--:--:--</div>
+          <div id="live-date" class="text-[10px] text-slate-400">--/--/----</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-8 space-y-6">
+
+    <!-- TAB 1: LIVE MONITOR -->
+    <section id="section-live" class="space-y-6">
+      
+      <!-- Camera Status Row (4 Channels: D1, D2, D3, D9) -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <!-- D1 Co-working -->
+        <div class="bg-[#111928] border border-slate-800 rounded-xl p-4 relative overflow-hidden transition-all hover:border-slate-700 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">D1</span>
+            <span class="flex h-2 w-2 relative">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+            </span>
+          </div>
+          <h4 class="font-semibold text-sm text-white">Co-working Space</h4>
+          <p class="text-xs text-slate-400 mt-0.5">ชั้น 1 โซน Co-working</p>
+          <div class="mt-3 flex items-center justify-between text-xs border-t border-slate-800/80 pt-2 text-slate-400">
+            <span>กิจกรรมล่าสุด</span>
+            <span id="cam-last-1" class="font-mono text-slate-300">-</span>
+          </div>
+        </div>
+
+        <!-- D2 Main Entrance -->
+        <div class="bg-[#111928] border border-cyan-800/50 rounded-xl p-4 relative overflow-hidden transition-all hover:border-cyan-600 shadow-sm shadow-cyan-950/20">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">D2 (MAIN)</span>
+            <span class="flex h-2 w-2 relative">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+            </span>
+          </div>
+          <h4 class="font-semibold text-sm text-white">Main Entrance</h4>
+          <p class="text-xs text-slate-400 mt-0.5">ทางเข้าหลัก อาคาร KLLC</p>
+          <div class="mt-3 flex items-center justify-between text-xs border-t border-slate-800/80 pt-2 text-slate-400">
+            <span>กิจกรรมล่าสุด</span>
+            <span id="cam-last-2" class="font-mono text-cyan-300">-</span>
+          </div>
+        </div>
+
+        <!-- D3 Sky Walk Door -->
+        <div class="bg-[#111928] border border-slate-800 rounded-xl p-4 relative overflow-hidden transition-all hover:border-slate-700 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">D3</span>
+            <span class="flex h-2 w-2 relative">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+            </span>
+          </div>
+          <h4 class="font-semibold text-sm text-white">Sky Walk Door</h4>
+          <p class="text-xs text-slate-400 mt-0.5">ประตูทางเชื่อม Sky Walk</p>
+          <div class="mt-3 flex items-center justify-between text-xs border-t border-slate-800/80 pt-2 text-slate-400">
+            <span>กิจกรรมล่าสุด</span>
+            <span id="cam-last-3" class="font-mono text-slate-300">-</span>
+          </div>
+        </div>
+
+        <!-- D9 Main Information -->
+        <div class="bg-[#111928] border border-slate-800 rounded-xl p-4 relative overflow-hidden transition-all hover:border-slate-700 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">D9</span>
+            <span class="flex h-2 w-2 relative">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+            </span>
+          </div>
+          <h4 class="font-semibold text-sm text-white">Main Information</h4>
+          <p class="text-xs text-slate-400 mt-0.5">เคาน์เตอร์ประชาสัมพันธ์หลัก</p>
+          <div class="mt-3 flex items-center justify-between text-xs border-t border-slate-800/80 pt-2 text-slate-400">
+            <span>กิจกรรมล่าสุด</span>
+            <span id="cam-last-9" class="font-mono text-slate-300">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-time Live Feed Container -->
+      <div class="bg-[#0f1726] border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 class="font-display font-bold text-lg text-white">แถบผลเทียบใบหน้าสด (Real-time Feed)</h3>
+              <span class="px-2 py-0.5 text-xs font-semibold rounded-md bg-emerald-950 text-emerald-400 border border-emerald-800/60">LIVE STREAM</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-0.5">รับเหตุการณ์จาก Hikvision ISAPI alertStream ผ่าน WebSocket โดยตรง</p>
+          </div>
+
+          <!-- Feed Controls & Sound -->
+          <div class="flex items-center space-x-3 w-full sm:w-auto justify-end">
+            <!-- Audio Toggle -->
+            <button id="btn-sound-toggle" onclick="toggleSound()" class="px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center space-x-1.5 transition">
+              <span id="sound-icon">🔔</span>
+              <span id="sound-label">เปิดเสียงแจ้งเตือน</span>
+            </button>
+
+            <!-- Pause / Resume Toggle -->
+            <button id="btn-pause-toggle" onclick="togglePauseStream()" class="px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center space-x-1.5 transition">
+              <span id="pause-icon">⏸️</span>
+              <span id="pause-label">หยุดชั่วคราว</span>
+            </button>
+
+            <!-- Test Simulation Button -->
+            <button onclick="simulateTestEvent('MATCHED')" class="px-3 py-1.5 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border border-cyan-800/50 text-xs font-medium flex items-center space-x-1 transition">
+              <span>+ เทสเทียบหน้า</span>
+            </button>
+            <button onclick="simulateTestEvent('UNKNOWN')" class="px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 text-xs font-medium transition" title="เทสไม่ทราบตัวตน">
+              <span>+ เทสไม่รู้จัก</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Feed Cards Grid / Stream -->
+        <div id="live-feed-list" class="mt-4 space-y-3 max-h-[620px] overflow-y-auto pr-2 custom-scrollbar">
+          <!-- Empty State Placeholder -->
+          <div id="feed-empty-state" class="py-16 text-center text-slate-500">
+            <svg class="w-12 h-12 mx-auto mb-3 text-slate-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <p class="text-sm font-medium text-slate-400">กำลังรอการตรวจจับใบหน้าจากเครื่อง NVR...</p>
+            <p class="text-xs text-slate-500 mt-1">เหตุการณ์เปรียบเทียบใบหน้า (Face Picture Comparison) จะปรากฏที่นี่ทันที</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: ACCESS HISTORY & SEARCH -->
+    <section id="section-history" class="space-y-6 hidden">
+      
+      <!-- Summary Metrics Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <!-- Total -->
+        <div class="bg-[#111928] border border-slate-800 rounded-xl p-4">
+          <div class="text-xs font-medium text-slate-400">เหตุการณ์ทั้งหมด</div>
+          <div id="stat-total" class="font-display font-bold text-2xl text-white mt-1">-</div>
+          <div class="text-[11px] text-slate-500 mt-1">นับรวมทั้งระบบวันนี้</div>
+        </div>
+
+        <!-- Matched -->
+        <div class="bg-[#111928] border border-emerald-900/40 rounded-xl p-4">
+          <div class="text-xs font-medium text-emerald-400 flex items-center justify-between">
+            <span>ระบุตัวตนได้ (MATCHED)</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          </div>
+          <div id="stat-matched" class="font-display font-bold text-2xl text-emerald-400 mt-1">-</div>
+          <div id="stat-unique-persons" class="text-[11px] text-emerald-500/80 mt-1">บุคลากรไม่ซ้ำ: - คน</div>
+        </div>
+
+        <!-- Unknown -->
+        <div class="bg-[#111928] border border-slate-800 rounded-xl p-4">
+          <div class="text-xs font-medium text-slate-400 flex items-center justify-between">
+            <span>ไม่ทราบตัวตน (UNKNOWN)</span>
+            <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+          </div>
+          <div id="stat-unknown" class="font-display font-bold text-2xl text-slate-300 mt-1">-</div>
+          <div class="text-[11px] text-slate-500 mt-1">ผู้มาติดต่อ / บุคคลภายนอก</div>
+        </div>
+
+        <!-- Match Rate -->
+        <div class="bg-[#111928] border border-cyan-900/40 rounded-xl p-4">
+          <div class="text-xs font-medium text-cyan-400">อัตราการรู้จำ (Match Rate)</div>
+          <div id="stat-match-rate" class="font-display font-bold text-2xl text-cyan-400 mt-1">-%</div>
+          <div class="text-[11px] text-cyan-500/80 mt-1">ประสิทธิภาพ AI ประจำวัน</div>
+        </div>
+
+        <!-- Direction IN / OUT -->
+        <div class="bg-[#111928] border border-slate-800 rounded-xl p-4 col-span-2 lg:col-span-1">
+          <div class="text-xs font-medium text-slate-400">ยอดทิศทาง เข้า / ออก</div>
+          <div class="flex items-baseline space-x-3 mt-1">
+            <span id="stat-in" class="font-display font-bold text-xl text-emerald-400">IN -</span>
+            <span class="text-slate-600">/</span>
+            <span id="stat-out" class="font-display font-bold text-xl text-slate-400">OUT -</span>
+          </div>
+          <div class="text-[11px] text-slate-500 mt-1">คำนวณตามช่องสัญญาณ</div>
+        </div>
+      </div>
+
+      <!-- Search & Filter Toolbar -->
+      <div class="bg-[#0f1726] border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+          <!-- Date Filter Preset -->
+          <div class="lg:col-span-2 space-y-1">
+            <label class="text-xs font-medium text-slate-300">ช่วงวันที่</label>
+            <div class="flex items-center space-x-1.5">
+              <button onclick="setDatePreset('today')" id="btn-date-today" class="date-preset-btn px-2.5 py-1.5 text-xs rounded-lg bg-cyan-600 text-white font-medium">วันนี้</button>
+              <button onclick="setDatePreset('yesterday')" id="btn-date-yesterday" class="date-preset-btn px-2.5 py-1.5 text-xs rounded-lg bg-slate-800 text-slate-400 hover:text-white font-medium">เมื่อวาน</button>
+              <button onclick="setDatePreset('7days')" id="btn-date-7days" class="date-preset-btn px-2.5 py-1.5 text-xs rounded-lg bg-slate-800 text-slate-400 hover:text-white font-medium">7 วัน</button>
+              <input type="date" id="filter-start-date" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2 py-1.5 focus:border-cyan-500 focus:outline-none" />
+              <input type="date" id="filter-end-date" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-2 py-1.5 focus:border-cyan-500 focus:outline-none" />
+            </div>
+          </div>
+
+          <!-- Search Keyword -->
+          <div class="lg:col-span-2 space-y-1">
+            <label class="text-xs font-medium text-slate-300">ค้นหาบุคคล (รหัส / ชื่อ-สกุล)</label>
+            <div class="relative">
+              <input type="text" id="filter-search" placeholder="พิมพ์รหัส 130009 หรือชื่อ..." class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg pl-8 pr-3 py-2 focus:border-cyan-500 focus:outline-none" />
+              <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            </div>
+          </div>
+
+          <!-- Camera Channel Filter -->
+          <div class="space-y-1">
+            <label class="text-xs font-medium text-slate-300">จุดติดตั้งกล้อง</label>
+            <select id="filter-channel" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:border-cyan-500 focus:outline-none">
+              <option value="">ทุกจุดติดตั้ง</option>
+              <option value="1">D1 - Co-working</option>
+              <option value="2">D2 - Main Entrance</option>
+              <option value="3">D3 - Sky Walk Door</option>
+              <option value="9">D9 - Main Information</option>
+            </select>
+          </div>
+
+          <!-- Library Filter -->
+          <div class="space-y-1">
+            <label class="text-xs font-medium text-slate-300">สังกัด / คลังใบหน้า</label>
+            <select id="filter-library" class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:border-cyan-500 focus:outline-none">
+              <option value="">ทั้งหมด</option>
+              <option value="KLLC STAFF">KLLC STAFF</option>
+              <option value="KLLC Access">KLLC Access</option>
+              <option value="UNKNOWN">ไม่ทราบตัวตน (UNKNOWN)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Filter Action Bar & Collapse Toggle -->
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-3 border-t border-slate-800">
+          
+          <!-- Collapse Consecutive Unknowns Toggle -->
+          <label class="flex items-center space-x-2.5 cursor-pointer text-xs text-slate-300 select-none">
+            <div class="relative">
+              <input type="checkbox" id="toggle-collapse-unknowns" class="sr-only" onchange="loadAccessEvents(0)" />
+              <div class="w-9 h-5 bg-slate-800 rounded-full transition-colors border border-slate-700" id="collapse-slider-bg"></div>
+              <div class="dot absolute left-0.5 top-0.5 bg-white w-4 h-4 rounded-full transition-transform" id="collapse-slider-dot"></div>
+            </div>
+            <span class="font-medium text-cyan-300">ยุบแถวไม่ทราบตัวตนที่ติดกัน (Collapse Consecutive Unknowns)</span>
+          </label>
+
+          <!-- Buttons: Search, Reset, Export Excel, Export CSV -->
+          <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+            <button onclick="loadAccessEvents(0)" class="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs flex items-center space-x-1.5 transition">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              <span>ค้นหา</span>
+            </button>
+            <button onclick="resetFilters()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">
+              รีเซ็ต
+            </button>
+            <button onclick="exportData('excel')" class="px-3 py-1.5 rounded-lg bg-emerald-700/30 hover:bg-emerald-700/50 text-emerald-400 border border-emerald-700/60 font-medium text-xs flex items-center space-x-1.5 transition">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              <span>ส่งออก Excel</span>
+            </button>
+            <button onclick="exportData('csv')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">
+              CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- History Data Table -->
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-[#121a29] text-slate-400 font-semibold uppercase tracking-wider">
+              <tr>
+                <th class="py-3 px-3">วันและเวลา</th>
+                <th class="py-3 px-3">จุดกล้อง</th>
+                <th class="py-3 px-3">สถานะ</th>
+                <th class="py-3 px-3">รหัสบุคคล</th>
+                <th class="py-3 px-3">ชื่อ-นามสกุล</th>
+                <th class="py-3 px-3">สังกัด / คลัง</th>
+                <th class="py-3 px-3 text-center">% เหมือน</th>
+                <th class="py-3 px-3 text-center">ทิศทาง</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body" class="divide-y divide-slate-800 font-normal">
+              <tr>
+                <td colspan="8" class="py-12 text-center text-slate-500">กำลังโหลดประวัติการเข้า-ออก...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination Bar -->
+        <div class="flex items-center justify-between pt-3 text-xs text-slate-400">
+          <div>
+            แสดงผล <span id="page-showing-start" class="font-bold text-white">0</span> ถึง <span id="page-showing-end" class="font-bold text-white">0</span> จากทั้งหมด <span id="page-showing-total" class="font-bold text-white">0</span> รายการ
+          </div>
+          <div class="flex items-center space-x-2">
+            <button id="btn-prev-page" onclick="changePage(-1)" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700">ก่อนหน้า</button>
+            <span id="page-current-num" class="font-mono text-cyan-400 font-bold px-2">1</span>
+            <button id="btn-next-page" onclick="changePage(1)" class="px-3 py-1.5 rounded bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700">ถัดไป</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 3: PERSONNEL SYNC -->
+    <section id="section-personnel" class="space-y-6 hidden">
+      <div class="bg-[#0f1726] border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
+        
+        <!-- Header & Sync Action -->
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div>
+            <h3 class="font-display font-bold text-lg text-white">คลังรายชื่อบุคลากร (Personnel Library)</h3>
+            <p class="text-xs text-slate-400 mt-0.5">ซิงก์ข้อมูลใบหน้าจาก NVR DeepinMind Pro (คลัง `KLLC STAFF` และ `KLLC Access` ผ่าน ISAPI FDLib)</p>
+          </div>
+
+          <div class="flex items-center space-x-3 w-full sm:w-auto">
+            <!-- Sync Button -->
+            <button id="btn-sync-nvr" onclick="triggerPersonnelSync()" class="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-medium text-xs flex items-center justify-center space-x-2 shadow-lg shadow-emerald-950/40 transition">
+              <svg id="sync-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span id="sync-btn-label">ซิงก์รายชื่อจาก NVR</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Search Bar for Personnel -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div class="relative w-full sm:w-80">
+            <input type="text" id="personnel-search-input" onkeyup="filterPersonnelList()" placeholder="ค้นหารหัส หรือชื่อบุคลากร..." class="w-full bg-slate-900 border border-slate-700 text-xs text-white rounded-lg pl-8 pr-3 py-2 focus:border-cyan-500 focus:outline-none" />
+            <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          </div>
+
+          <div id="personnel-count-summary" class="text-xs text-slate-400">
+            พบบุคลากรทั้งหมด <span id="personnel-total-count" class="font-bold text-emerald-400">0</span> คน
+          </div>
+        </div>
+
+        <!-- Personnel Table -->
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-[#121a29] text-slate-400 font-semibold uppercase tracking-wider">
+              <tr>
+                <th class="py-3 px-3">รหัสบุคคล (Person Code)</th>
+                <th class="py-3 px-3">ชื่อ-นามสกุล</th>
+                <th class="py-3 px-3">สังกัด / คลังใบหน้า</th>
+                <th class="py-3 px-3 text-center">สถานะความยินยอม (PDPA)</th>
+                <th class="py-3 px-3 text-right">อัปเดตล่าสุด</th>
+              </tr>
+            </thead>
+            <tbody id="personnel-table-body" class="divide-y divide-slate-800 font-normal">
+              <tr>
+                <td colspan="5" class="py-12 text-center text-slate-500">กำลังโหลดรายชื่อบุคลากร...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-[#0a0f17] border-t border-slate-800/80 px-4 py-3 text-center text-xs text-slate-500">
+    <span>KLLC Smart Access Lite • iDS-7716NXI-M4/X ISAPI Face Recognition Engine • สำนักการเรียนรู้ตลอดชีวิต สจล.</span>
+  </footer>
+
+  <!-- Notification Toast Container -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- Custom Scripts -->
+  <script src="/static/app.js"></script>
+</body>
+</html>
