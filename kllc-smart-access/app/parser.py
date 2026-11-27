@@ -85,24 +85,32 @@ def parse_alert_xml(xml_content: str) -> Optional[Dict[str, Any]]:
             event_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Find Channel ID
-        raw_ch = find_first_text(root, ".//channelID", ".//dynChannelID", ".//channelNumber")
+        raw_ch = find_first_text(root, ".//channelID", ".//dynChannelID", ".//channelNumber", ".//cameraID")
         channel_id = normalize_channel_id(raw_ch) if raw_ch else 1
 
         cam_config = CAMERA_CHANNELS.get(channel_id, {})
         camera_name = cam_config.get("name", f"Camera D{channel_id}")
 
-        # Check for Face Match details
-        match_el = find_first(root, ".//FaceMatch", ".//match", ".//FaceMatchInfo")
-        is_face_event = any(k in event_type.lower() for k in ["face", "snap", "facematch", "facesnapmatch"])
+        # Ignore non-face heartbeat / motion alerts
+        et_lower = event_type.lower()
+        if et_lower in ("videoloss", "vmd", "heartbeat", "shelteralarm", "diskfull", "illaccess"):
+            return None
+
+        # Check for Face Match details (supports standard & DeepinMind Pro schemas)
+        match_el = find_first(root, ".//FaceMatch", ".//MatchElement", ".//Candidate", ".//match", ".//FaceMatchInfo")
+        is_face_event = any(k in et_lower for k in ["face", "snap", "contrast", "hfpd", "facematch", "facesnap"])
 
         if match_el is not None:
             match_status = "MATCHED"
 
-            # Check inside personInfo sub-element first, then match_el
-            person_info_el = find_first(match_el, ".//personInfo", ".//PersonInfo")
+            # Check inside personInfo / HumanInfo sub-element first, then match_el
+            person_info_el = find_first(match_el, ".//personInfo", ".//PersonInfo", ".//HumanInfo")
             target_person_el = person_info_el if person_info_el is not None else match_el
 
-            person_code = find_first_text(target_person_el, ".//customInfo", ".//personCode", ".//employeeNo")
+            person_code = find_first_text(
+                target_person_el,
+                ".//customInfo", ".//personCode", ".//employeeNo", ".//certificateNumber", ".//FPID", ".//PID"
+            )
             full_name = find_first_text(target_person_el, ".//name", ".//personName")
 
             # If person_code not set, attempt to extract from name (e.g. 130009_Yupin Lo)
@@ -113,7 +121,11 @@ def parse_alert_xml(xml_content: str) -> Optional[Dict[str, Any]]:
 
             # Library Name
             fd_lib_node = find_first(match_el, ".//FDLib", ".//FDLibInfo")
-            lib_name = find_first_text(fd_lib_node, ".//name") if fd_lib_node is not None else find_first_text(match_el, ".//libName")
+            lib_name = (
+                find_first_text(fd_lib_node, ".//name")
+                if fd_lib_node is not None
+                else find_first_text(match_el, ".//FDLibName", ".//libName")
+            )
             if not lib_name:
                 lib_name = "KLLC STAFF"
 
@@ -129,7 +141,10 @@ def parse_alert_xml(xml_content: str) -> Optional[Dict[str, Any]]:
                     similarity = 0.0
 
             # Snapshot URL
-            snapshot_url = find_first_text(match_el, ".//pictureURL", ".//snapURL") or find_first_text(root, ".//pictureURL", ".//snapURL")
+            snapshot_url = (
+                find_first_text(match_el, ".//pictureURL", ".//snapURL", ".//faceURL")
+                or find_first_text(root, ".//pictureURL", ".//snapURL", ".//faceURL")
+            )
 
             return {
                 "event_type": event_type,
@@ -147,7 +162,7 @@ def parse_alert_xml(xml_content: str) -> Optional[Dict[str, Any]]:
 
         elif is_face_event:
             # Face detected but not matched (UNKNOWN)
-            snapshot_url = find_first_text(root, ".//pictureURL", ".//snapURL", ".//picture")
+            snapshot_url = find_first_text(root, ".//pictureURL", ".//snapURL", ".//faceURL", ".//picture")
 
             return {
                 "event_type": event_type,
@@ -164,7 +179,7 @@ def parse_alert_xml(xml_content: str) -> Optional[Dict[str, Any]]:
             }
 
         # People Counting event
-        if "peoplecounting" in event_type.lower():
+        if "peoplecounting" in et_lower:
             enter_str = find_first_text(root, ".//enter", ".//enterNum") or "0"
             exit_str = find_first_text(root, ".//exit", ".//exitNum") or "0"
             return {
@@ -177,15 +192,21 @@ def parse_alert_xml(xml_content: str) -> Optional[Dict[str, Any]]:
             }
 
         return None
-    except Exception as e:
+    except Exception:
         return None
 
 def parse_alert_json(json_content: str) -> Optional[Dict[str, Any]]:
-    """Parse Hikvision JSON Alert notification."""
+    """Parse Hikvision JSON Alert notification (DeepinMind Pro & standard ISAPI)."""
     try:
         data = json.loads(json_content)
-        event_type = data.get("eventType", "")
-        raw_ch = data.get("channelID", data.get("dynChannelID", 1))
+        event_type = str(data.get("eventType", ""))
+        et_lower = event_type.lower()
+
+        # Ignore non-face heartbeat / motion alerts
+        if et_lower in ("videoloss", "vmd", "heartbeat", "shelteralarm", "diskfull", "illaccess"):
+            return None
+
+        raw_ch = data.get("channelID", data.get("dynChannelID", data.get("cameraID", 1)))
         channel_id = normalize_channel_id(raw_ch)
         cam_config = CAMERA_CHANNELS.get(channel_id, {})
         camera_name = cam_config.get("name", f"Camera D{channel_id}")
@@ -194,15 +215,45 @@ def parse_alert_json(json_content: str) -> Optional[Dict[str, Any]]:
         if "T" in event_time_str:
             event_time_str = event_time_str.replace("T", " ").split("+")[0].split(".")[0]
 
-        matches = data.get("FaceMatchList", data.get("MatchList", []))
+        # Extract matches from standard or DeepinMind Pro JSON envelopes
+        matches = (
+            data.get("FaceMatchList")
+            or data.get("MatchList")
+            or (data.get("FaceContrastEvent", {}).get("MatchList") if isinstance(data.get("FaceContrastEvent"), dict) else None)
+            or (data.get("CaptureResult", [{}])[0].get("Candidate") if isinstance(data.get("CaptureResult"), list) and data.get("CaptureResult") else None)
+            or []
+        )
+        is_face_event = any(k in et_lower for k in ["face", "snap", "contrast", "hfpd"]) or bool(matches)
+        if not is_face_event:
+            return None
+
         if matches and len(matches) > 0:
             m = matches[0]
-            person_info = m.get("personInfo", {})
-            p_code = person_info.get("customInfo", person_info.get("personCode"))
-            p_name = person_info.get("name")
+            person_info = m.get("personInfo", m.get("HumanInfo", m))
+            p_code = (
+                person_info.get("customInfo")
+                or person_info.get("personCode")
+                or person_info.get("certificateNumber")
+                or person_info.get("FPID")
+                or m.get("FPID")
+                or m.get("PID")
+            )
+            p_name = person_info.get("name") or person_info.get("personName")
+            if not p_code and p_name and "_" in p_name:
+                parts = p_name.split("_", 1)
+                if parts[0].isdigit():
+                    p_code = parts[0]
+
             sim_val = float(m.get("similarity", 0.0))
             if sim_val <= 1.0:
                 sim_val = sim_val * 100.0
+
+            lib_name = (
+                (m.get("FDLib", {}).get("name") if isinstance(m.get("FDLib"), dict) else None)
+                or m.get("FDLibName")
+                or m.get("libName")
+                or "KLLC STAFF"
+            )
 
             return {
                 "event_type": event_type,
@@ -210,12 +261,12 @@ def parse_alert_json(json_content: str) -> Optional[Dict[str, Any]]:
                 "channel_id": channel_id,
                 "camera_name": camera_name,
                 "match_status": "MATCHED",
-                "person_code": p_code,
-                "full_name": p_name,
-                "library_name": m.get("FDLib", {}).get("name", "KLLC STAFF"),
+                "person_code": p_code or "UNKNOWN",
+                "full_name": p_name or "Unknown Person",
+                "library_name": lib_name,
                 "similarity": round(sim_val, 1),
                 "direction": "IN" if channel_id in (2, 3) else "OUT",
-                "snapshot_url": m.get("pictureURL")
+                "snapshot_url": m.get("pictureURL") or m.get("faceURL") or data.get("pictureURL")
             }
         else:
             return {
@@ -229,7 +280,7 @@ def parse_alert_json(json_content: str) -> Optional[Dict[str, Any]]:
                 "library_name": None,
                 "similarity": 0.0,
                 "direction": "IN" if channel_id in (2, 3) else "OUT",
-                "snapshot_url": data.get("pictureURL")
+                "snapshot_url": data.get("pictureURL") or data.get("faceURL")
             }
     except Exception:
         return None

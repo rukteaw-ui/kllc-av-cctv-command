@@ -9,7 +9,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 # NVR Connection Settings
-NVR_IP = os.getenv("NVR_IP", "192.168.1.100")
+NVR_IP = os.getenv("NVR_IP", "10.37.2.97")
 NVR_PORT = int(os.getenv("NVR_PORT", "80"))
 NVR_USER = os.getenv("NVR_USER", "admin")
 NVR_PASS = os.getenv("NVR_PASS", "Admin12345!")

@@ -35,11 +35,12 @@ async def websocket_endpoint(websocket: WebSocket):
 
     # Send initial connection handshake
     isapi_client = getattr(websocket.app.state, "isapi_client", None)
+    is_conn = isapi_client.is_connected if isapi_client else False
     await websocket.send_json({
         "type": "CONNECTION_INIT",
         "data": {
-            "connected": isapi_client.is_connected if isapi_client else False,
-            "message": "Connected to KLLC Smart Access WebSocket stream."
+            "connected": is_conn,
+            "message": "NVR เชื่อมต่อปกติ" if is_conn else "พร้อมใช้งาน (กด ⚙️ ตั้งค่า NVR เพื่อเชื่อมต่อ)"
         }
     })
 

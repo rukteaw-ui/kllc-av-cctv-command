@@ -1,14 +1,16 @@
 import asyncio
+import json
 import logging
+import re
 import xml.etree.ElementTree as ET
-from typing import Dict, Any, List, Optional, Callable, AsyncGenerator
+from typing import Dict, Any, List, Optional, Callable
 import httpx
 
 from app.config import (
     NVR_IP, NVR_PORT, NVR_BASE_URL, NVR_USER, NVR_PASS, TARGET_LIBRARIES,
     SAFE_ENDPOINTS, SIMULATION_MODE
 )
-from app.parser import parse_alert_payload, clean_tag, parse_xml_tree
+from app.parser import parse_alert_payload, clean_tag, parse_xml_tree, find_first_text
 
 logger = logging.getLogger("isapi_client")
 
@@ -94,20 +96,19 @@ class HikvisionISAPIClient:
                 if resp.status_code == 200:
                     root = parse_xml_tree(resp.text)
                     if root is not None:
-                        for fd_el in root.findall(".//FDLib"):
-                            fdid_el = fd_el.find(".//FDID")
-                            name_el = fd_el.find(".//name")
-                            cap_el = fd_el.find(".//faceLibCapacity") or fd_el.find(".//recordCount")
-                            
-                            fdid = fdid_el.text.strip() if fdid_el is not None and fdid_el.text else ""
-                            name = name_el.text.strip() if name_el is not None and name_el.text else ""
-                            cap = int(cap_el.text.strip()) if cap_el is not None and cap_el.text and cap_el.text.isdigit() else 0
+                        nodes = root.findall(".//FDLibBaseCfg") or root.findall(".//FDLib")
+                        for fd_el in nodes:
+                            fdid = find_first_text(fd_el, ".//FDID", ".//id") or ""
+                            name = find_first_text(fd_el, ".//name", ".//Name") or ""
+                            cap_str = find_first_text(fd_el, ".//faceLibCapacity", ".//recordCount") or "0"
+                            cap = int(cap_str) if cap_str.isdigit() else 0
 
-                            libraries.append({
-                                "fdid": fdid,
-                                "name": name,
-                                "count": cap
-                            })
+                            if fdid or name:
+                                libraries.append({
+                                    "fdid": fdid,
+                                    "name": name,
+                                    "count": cap
+                                })
         except Exception as e:
             logger.error(f"Error fetching face libraries: {e}")
         return libraries
@@ -117,47 +118,84 @@ class HikvisionISAPIClient:
         endpoint = SAFE_ENDPOINTS["fd_search"]
         url = f"{self.base_url}{endpoint}"
 
-        xml_payload = f"""<?xml version="1.0" encoding="UTF-8"?>
+        results = []
+        position = 0
+        page_size = min(max_results, 100)
+
+        try:
+            async with await self._get_client(timeout=15.0) as client:
+                while len(results) < max_results:
+                    xml_payload = f"""<?xml version="1.0" encoding="UTF-8"?>
 <FDSearchDescription xmlns="http://www.hikvision.com/ver20/XMLSchema" version="2.0">
     <searchID>1</searchID>
     <FDID>{fdid}</FDID>
-    <searchResultPosition>0</searchResultPosition>
-    <maxResults>{max_results}</maxResults>
+    <searchResultPosition>{position}</searchResultPosition>
+    <maxResults>{page_size}</maxResults>
 </FDSearchDescription>"""
+                    resp = await client.post(
+                        url,
+                        content=xml_payload.encode("utf-8"),
+                        headers={"Content-Type": "application/xml; charset=UTF-8"}
+                    )
+                    if resp.status_code != 200:
+                        break
 
-        results = []
-        try:
-            async with await self._get_client(timeout=15.0) as client:
-                resp = await client.post(
-                    url,
-                    content=xml_payload.encode("utf-8"),
-                    headers={"Content-Type": "application/xml; charset=UTF-8"}
-                )
-                if resp.status_code == 200:
-                    root = parse_xml_tree(resp.text)
-                    if root is not None:
-                        for item in root.findall(".//searchResult") or root.findall(".//FDSearchResult"):
-                            pid_el = item.find(".//PID")
-                            name_el = item.find(".//name")
-                            code_el = item.find(".//customInfo") or item.find(".//personCode")
-                            model_status_el = item.find(".//modelStatus")
+                    text = resp.text.strip()
+                    batch = []
+                    total_matches = 0
 
-                            pid = pid_el.text.strip() if pid_el is not None and pid_el.text else ""
-                            name = name_el.text.strip() if name_el is not None and name_el.text else ""
-                            code = code_el.text.strip() if code_el is not None and code_el.text else ""
+                    if text.startswith("{"):
+                        data = json.loads(text)
+                        total_matches = int(data.get("totalMatches", 0))
+                        items = data.get("MatchList", data.get("searchResult", []))
+                        for it in items:
+                            pid = str(it.get("PID") or it.get("FPID") or "")
+                            name = str(it.get("name") or "")
+                            code = str(it.get("customInfo") or it.get("personCode") or it.get("certificateNumber") or "")
+                            if not code and name and "_" in name and name.split("_", 1)[0].isdigit():
+                                code = name.split("_", 1)[0]
+                            batch.append({
+                                "pid": pid,
+                                "person_code": code or pid,
+                                "full_name": name or "Unknown",
+                                "fdid": fdid,
+                                "model_status": str(it.get("modelStatus", "unknown"))
+                            })
+                    else:
+                        root = parse_xml_tree(text)
+                        if root is None:
+                            break
+                        total_str = find_first_text(root, ".//totalMatches") or "0"
+                        total_matches = int(total_str) if total_str.isdigit() else 0
+                        items = (
+                            root.findall(".//MatchElement")
+                            or root.findall(".//searchResult")
+                            or root.findall(".//FDSearchResult")
+                        )
+                        for item in items:
+                            pid = find_first_text(item, ".//PID", ".//FPID") or ""
+                            name = find_first_text(item, ".//name", ".//personName") or ""
+                            code = find_first_text(item, ".//customInfo", ".//personCode", ".//certificateNumber") or ""
+                            model_status = find_first_text(item, ".//modelStatus") or "unknown"
 
                             if not code and name and "_" in name:
                                 parts = name.split("_", 1)
                                 if parts[0].isdigit():
                                     code = parts[0]
 
-                            results.append({
-                                "pid": pid,
-                                "person_code": code or pid,
-                                "full_name": name or "Unknown",
-                                "fdid": fdid,
-                                "model_status": model_status_el.text.strip() if model_status_el is not None and model_status_el.text else "unknown"
-                            })
+                            if pid or name or code:
+                                batch.append({
+                                    "pid": pid,
+                                    "person_code": code or pid,
+                                    "full_name": name or "Unknown",
+                                    "fdid": fdid,
+                                    "model_status": model_status
+                                })
+
+                    results.extend(batch)
+                    if not batch or (total_matches > 0 and len(results) >= total_matches) or len(batch) < page_size:
+                        break
+                    position += len(batch)
         except Exception as e:
             logger.error(f"Error searching faces in library {fdid}: {e}")
         return results
@@ -228,13 +266,15 @@ class HikvisionISAPIClient:
         logger.info(f"Starting ISAPI alert stream listener at {url}")
 
         while not self._stop_event.is_set():
+            url = f"{self.base_url}{endpoint}"
             try:
-                await status_callback({"connected": False, "status": "connecting", "message": f"Connecting to NVR ({self.base_url})..."})
+                await status_callback({"connected": False, "status": "connecting", "message": f"กำลังเชื่อมต่อ NVR ({self.nvr_ip})..."})
                 
                 # Check device online first
                 dev_info = await self.get_device_info()
                 if dev_info.get("status") != "online":
-                    raise ConnectionError(f"NVR offline or unreachable: {dev_info.get('error', 'Auth/Network Error')}")
+                    err_detail = f"HTTP {dev_info.get('code')}" if dev_info.get("code") else dev_info.get("error", "Auth/Network Error")
+                    raise ConnectionError(f"NVR offline or unreachable: {err_detail}")
 
                 async with httpx.AsyncClient(auth=self.auth, timeout=None, verify=False) as client:
                     async with client.stream("GET", url) as stream_resp:
@@ -246,34 +286,54 @@ class HikvisionISAPIClient:
                         await status_callback({
                             "connected": True,
                             "status": "connected",
-                            "message": f"Connected to NVR ({dev_info.get('model', 'iDS-7716NXI-M4/X')})"
+                            "message": f"NVR เชื่อมต่อปกติ ({dev_info.get('model', 'iDS-7716NXI-M4/X')})"
                         })
 
-                        buffer = ""
-                        async for chunk in stream_resp.aiter_text():
+                        # Detect MIME boundary from Content-Type header (e.g. multipart/mixed; boundary=boundary)
+                        ct_header = stream_resp.headers.get("content-type", "")
+                        b_match = re.search(r'boundary=([^;\s"]+)', ct_header, re.IGNORECASE)
+                        boundary_str = b_match.group(1).strip('"') if b_match else "boundary"
+                        if not boundary_str.startswith("--"):
+                            boundary_bytes = f"--{boundary_str}".encode("ascii", errors="ignore")
+                        else:
+                            boundary_bytes = boundary_str.encode("ascii", errors="ignore")
+
+                        buf = b""
+                        async for chunk in stream_resp.aiter_bytes():
                             if self._stop_event.is_set():
                                 break
 
-                            buffer += chunk
-                            # Split by boundary lines (e.g. --MIME_boundary, --boundary)
-                            if "--" in buffer:
-                                parts = buffer.split("--")
-                                # Keep the last incomplete part in buffer
-                                buffer = parts[-1]
+                            buf += chunk
+                            # Prevent unbounded memory growth on malformed streams (cap at 10 MB)
+                            if len(buf) > 10 * 1024 * 1024:
+                                buf = buf[-2 * 1024 * 1024:]
+
+                            if boundary_bytes in buf:
+                                parts = buf.split(boundary_bytes)
+                                buf = parts[-1]
 
                                 for part in parts[:-1]:
-                                    part = part.strip()
-                                    if not part:
+                                    if not part or len(part) < 10:
                                         continue
 
-                                    # Extract body (skip MIME headers)
-                                    body = part
-                                    if "\r\n\r\n" in part:
-                                        body = part.split("\r\n\r\n", 1)[1]
-                                    elif "\n\n" in part:
-                                        body = part.split("\n\n", 1)[1]
+                                    # Split MIME headers and body
+                                    if b"\r\n\r\n" in part:
+                                        headers_raw, body_raw = part.split(b"\r\n\r\n", 1)
+                                    elif b"\n\n" in part:
+                                        headers_raw, body_raw = part.split(b"\n\n", 1)
+                                    else:
+                                        headers_raw, body_raw = b"", part
 
-                                    parsed_event = parse_alert_payload(body)
+                                    headers_lower = headers_raw.decode("ascii", errors="ignore").lower()
+                                    # Skip raw binary image attachments (JPEG/PNG) safely
+                                    if "image/" in headers_lower or body_raw.startswith(b"\xff\xd8"):
+                                        continue
+
+                                    body_text = body_raw.decode("utf-8", errors="ignore").strip()
+                                    if not body_text:
+                                        continue
+
+                                    parsed_event = parse_alert_payload(body_text)
                                     if parsed_event:
                                         await event_callback(parsed_event)
 

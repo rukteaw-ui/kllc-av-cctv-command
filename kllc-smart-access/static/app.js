@@ -173,7 +173,7 @@ function initWebSocket() {
 
   state.ws.onopen = () => {
     console.log("WebSocket connected to KLLC backend.");
-    updateNvrStatusBadge(true, "เชื่อมต่อเซิร์ฟเวอร์แล้ว (Listening)");
+    loadSystemStatus();
   };
 
   state.ws.onmessage = (event) => {
