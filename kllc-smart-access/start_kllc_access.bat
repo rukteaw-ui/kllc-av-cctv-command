@@ -21,33 +21,38 @@ if not exist "requirements.txt" (
     exit /b 1
 )
 
-REM 2. Detect real Python installation (avoid Windows Store stub)
-set "PY_CMD="
-py -3 --version >nul 2>&1
-if %errorlevel% equ 0 (
-    set "PY_CMD=py -3"
-) else (
-    python --version >nul 2>&1
-    if %errorlevel% equ 0 (
-        set "PY_CMD=python"
+REM 2. Detect real Python installation directly from standard folders first (ignores stale PATH)
+set "PY_EXE="
+
+for /d %%D in ("%LOCALAPPDATA%\Programs\Python\Python3*") do (
+    if exist "%%~D\python.exe" set "PY_EXE=%%~D\python.exe"
+)
+if not defined PY_EXE (
+    for /d %%D in ("C:\Program Files\Python3*") do (
+        if exist "%%~D\python.exe" set "PY_EXE=%%~D\python.exe"
+    )
+)
+if not defined PY_EXE (
+    for /f "delims=" %%P in ('where python 2^>nul') do (
+        echo "%%~P" | findstr /i "WindowsApps" >nul
+        if errorlevel 1 (
+            if not defined PY_EXE set "PY_EXE=%%~P"
+        )
     )
 )
 
-if "%PY_CMD%"=="" (
+if not defined PY_EXE (
     echo [ERROR] Python is not installed on this computer.
     echo.
-    echo Opening Python download page in your browser...
-    echo   1. Click "Download Windows installer (64-bit)" (.exe)
-    echo   2. IMPORTANT: Check "Add python.exe to PATH" at the bottom
-    echo   3. Click "Install Now", then double-click start_kllc_access.bat again
+    echo Please install Python 64-bit (.exe) from:
+    echo   https://www.python.org/downloads/windows/
     echo.
-    start "" "https://www.python.org/downloads/windows/"
     pause
     exit /b 1
 )
 
-echo [OK] Found Python:
-%PY_CMD% --version
+echo [OK] Found Python: "%PY_EXE%"
+"%PY_EXE%" --version
 echo.
 
 REM 3. Create .env from .env.example if missing
@@ -61,8 +66,8 @@ if not exist ".env" (
 REM 4. Create Virtual Environment (.venv) if missing
 if not exist ".venv\Scripts\python.exe" (
     echo [INFO] Setting up Python environment for first-time use...
-    %PY_CMD% -m venv .venv
-    if %errorlevel% neq 0 (
+    "%PY_EXE%" -m venv .venv
+    if errorlevel 1 (
         echo [ERROR] Failed to create virtual environment.
         pause
         exit /b 1
@@ -73,7 +78,7 @@ REM 5. Install / verify required packages
 echo [INFO] Checking and installing required packages (please wait)...
 ".venv\Scripts\python.exe" -m pip install --upgrade pip >nul 2>&1
 ".venv\Scripts\python.exe" -m pip install -r requirements.txt
-if %errorlevel% neq 0 (
+if errorlevel 1 (
     echo.
     echo [ERROR] Package installation failed. Please check your internet connection.
     pause
