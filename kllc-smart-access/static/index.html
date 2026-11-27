@@ -146,73 +146,97 @@
     <!-- TAB 1: LIVE MONITOR -->
     <section id="section-live" class="space-y-6">
       
-      <!-- Camera Status Row (4 Channels: D1, D2, D3, D9) -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <!-- Camera Live View Grid (4 Channels: D1, D2, D3, D9) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- D1 Co-working -->
-        <div class="bg-[#111928] border border-slate-800 rounded-xl p-4 relative overflow-hidden transition-all hover:border-slate-700 shadow-sm">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">D1</span>
-            <span class="flex h-2 w-2 relative">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-            </span>
+        <div class="bg-[#111928] border border-slate-800 rounded-xl overflow-hidden transition-all hover:border-cyan-700/80 shadow-sm flex flex-col">
+          <div onclick="openCameraZoom(1, 'D1 - Co-working Space')" class="relative aspect-video bg-[#080d16] cursor-pointer group overflow-hidden">
+            <img id="cam-img-1" alt="D1 Co-working Space" class="hidden w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+            <div id="cam-placeholder-1" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 p-3 text-center">
+              <svg class="w-8 h-8 mb-1.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              <span class="text-[11px]">รอภาพจากกล้อง D1...</span>
+            </div>
+            <div class="absolute top-2 left-2 flex items-center space-x-1.5">
+              <span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-black/70 text-cyan-300 border border-slate-700/80 backdrop-blur-sm">D1</span>
+              <span id="cam-live-badge-1" class="hidden text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-600/90 text-white">LIVE</span>
+            </div>
           </div>
-          <h4 class="font-semibold text-sm text-white">Co-working Space</h4>
-          <p class="text-xs text-slate-400 mt-0.5">ชั้น 1 โซน Co-working</p>
-          <div class="mt-3 flex items-center justify-between text-xs border-t border-slate-800/80 pt-2 text-slate-400">
-            <span>กิจกรรมล่าสุด</span>
-            <span id="cam-last-1" class="font-mono text-slate-300">-</span>
+          <div class="p-3">
+            <h4 class="font-semibold text-sm text-white">Co-working Space</h4>
+            <p class="text-[11px] text-slate-400">ชั้น 1 โซน Co-working</p>
+            <div class="mt-2 flex items-center justify-between text-[11px] border-t border-slate-800/80 pt-1.5 text-slate-400">
+              <span>กิจกรรมล่าสุด</span>
+              <span id="cam-last-1" class="font-mono text-slate-300">-</span>
+            </div>
           </div>
         </div>
 
         <!-- D2 Main Entrance -->
-        <div class="bg-[#111928] border border-cyan-800/50 rounded-xl p-4 relative overflow-hidden transition-all hover:border-cyan-600 shadow-sm shadow-cyan-950/20">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">D2 (MAIN)</span>
-            <span class="flex h-2 w-2 relative">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-            </span>
+        <div class="bg-[#111928] border border-cyan-800/60 rounded-xl overflow-hidden transition-all hover:border-cyan-500 shadow-sm shadow-cyan-950/20 flex flex-col">
+          <div onclick="openCameraZoom(2, 'D2 (MAIN) - Main Entrance')" class="relative aspect-video bg-[#080d16] cursor-pointer group overflow-hidden">
+            <img id="cam-img-2" alt="D2 Main Entrance" class="hidden w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+            <div id="cam-placeholder-2" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 p-3 text-center">
+              <svg class="w-8 h-8 mb-1.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              <span class="text-[11px]">รอภาพจากกล้อง D2...</span>
+            </div>
+            <div class="absolute top-2 left-2 flex items-center space-x-1.5">
+              <span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-950/90 text-cyan-300 border border-cyan-700 backdrop-blur-sm">D2 (MAIN)</span>
+              <span id="cam-live-badge-2" class="hidden text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-600/90 text-white">LIVE</span>
+            </div>
           </div>
-          <h4 class="font-semibold text-sm text-white">Main Entrance</h4>
-          <p class="text-xs text-slate-400 mt-0.5">ทางเข้าหลัก อาคาร KLLC</p>
-          <div class="mt-3 flex items-center justify-between text-xs border-t border-slate-800/80 pt-2 text-slate-400">
-            <span>กิจกรรมล่าสุด</span>
-            <span id="cam-last-2" class="font-mono text-cyan-300">-</span>
+          <div class="p-3">
+            <h4 class="font-semibold text-sm text-white">Main Entrance</h4>
+            <p class="text-[11px] text-slate-400">ทางเข้าหลัก อาคาร KLLC</p>
+            <div class="mt-2 flex items-center justify-between text-[11px] border-t border-slate-800/80 pt-1.5 text-slate-400">
+              <span>กิจกรรมล่าสุด</span>
+              <span id="cam-last-2" class="font-mono text-cyan-300">-</span>
+            </div>
           </div>
         </div>
 
         <!-- D3 Sky Walk Door -->
-        <div class="bg-[#111928] border border-slate-800 rounded-xl p-4 relative overflow-hidden transition-all hover:border-slate-700 shadow-sm">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">D3</span>
-            <span class="flex h-2 w-2 relative">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-            </span>
+        <div class="bg-[#111928] border border-slate-800 rounded-xl overflow-hidden transition-all hover:border-cyan-700/80 shadow-sm flex flex-col">
+          <div onclick="openCameraZoom(3, 'D3 - Sky Walk Door')" class="relative aspect-video bg-[#080d16] cursor-pointer group overflow-hidden">
+            <img id="cam-img-3" alt="D3 Sky Walk Door" class="hidden w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+            <div id="cam-placeholder-3" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 p-3 text-center">
+              <svg class="w-8 h-8 mb-1.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              <span class="text-[11px]">รอภาพจากกล้อง D3...</span>
+            </div>
+            <div class="absolute top-2 left-2 flex items-center space-x-1.5">
+              <span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-black/70 text-cyan-300 border border-slate-700/80 backdrop-blur-sm">D3</span>
+              <span id="cam-live-badge-3" class="hidden text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-600/90 text-white">LIVE</span>
+            </div>
           </div>
-          <h4 class="font-semibold text-sm text-white">Sky Walk Door</h4>
-          <p class="text-xs text-slate-400 mt-0.5">ประตูทางเชื่อม Sky Walk</p>
-          <div class="mt-3 flex items-center justify-between text-xs border-t border-slate-800/80 pt-2 text-slate-400">
-            <span>กิจกรรมล่าสุด</span>
-            <span id="cam-last-3" class="font-mono text-slate-300">-</span>
+          <div class="p-3">
+            <h4 class="font-semibold text-sm text-white">Sky Walk Door</h4>
+            <p class="text-[11px] text-slate-400">ประตูทางเชื่อม Sky Walk</p>
+            <div class="mt-2 flex items-center justify-between text-[11px] border-t border-slate-800/80 pt-1.5 text-slate-400">
+              <span>กิจกรรมล่าสุด</span>
+              <span id="cam-last-3" class="font-mono text-slate-300">-</span>
+            </div>
           </div>
         </div>
 
         <!-- D9 Main Information -->
-        <div class="bg-[#111928] border border-slate-800 rounded-xl p-4 relative overflow-hidden transition-all hover:border-slate-700 shadow-sm">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">D9</span>
-            <span class="flex h-2 w-2 relative">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-            </span>
+        <div class="bg-[#111928] border border-slate-800 rounded-xl overflow-hidden transition-all hover:border-cyan-700/80 shadow-sm flex flex-col">
+          <div onclick="openCameraZoom(9, 'D9 - Main Information')" class="relative aspect-video bg-[#080d16] cursor-pointer group overflow-hidden">
+            <img id="cam-img-9" alt="D9 Main Information" class="hidden w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+            <div id="cam-placeholder-9" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 p-3 text-center">
+              <svg class="w-8 h-8 mb-1.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              <span class="text-[11px]">รอภาพจากกล้อง D9...</span>
+            </div>
+            <div class="absolute top-2 left-2 flex items-center space-x-1.5">
+              <span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-black/70 text-cyan-300 border border-slate-700/80 backdrop-blur-sm">D9</span>
+              <span id="cam-live-badge-9" class="hidden text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-600/90 text-white">LIVE</span>
+            </div>
           </div>
-          <h4 class="font-semibold text-sm text-white">Main Information</h4>
-          <p class="text-xs text-slate-400 mt-0.5">เคาน์เตอร์ประชาสัมพันธ์หลัก</p>
-          <div class="mt-3 flex items-center justify-between text-xs border-t border-slate-800/80 pt-2 text-slate-400">
-            <span>กิจกรรมล่าสุด</span>
-            <span id="cam-last-9" class="font-mono text-slate-300">-</span>
+          <div class="p-3">
+            <h4 class="font-semibold text-sm text-white">Main Information</h4>
+            <p class="text-[11px] text-slate-400">เคาน์เตอร์ประชาสัมพันธ์หลัก</p>
+            <div class="mt-2 flex items-center justify-between text-[11px] border-t border-slate-800/80 pt-1.5 text-slate-400">
+              <span>กิจกรรมล่าสุด</span>
+              <span id="cam-last-9" class="font-mono text-slate-300">-</span>
+            </div>
           </div>
         </div>
       </div>
@@ -542,6 +566,22 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Camera Zoom Modal -->
+  <div id="camera-zoom-modal" onclick="closeCameraZoom()" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+    <div onclick="event.stopPropagation()" class="bg-[#0f1726] border border-slate-700 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+        <div class="flex items-center space-x-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <h3 id="camera-zoom-title" class="font-display font-bold text-sm text-white">Live Camera</h3>
+        </div>
+        <button onclick="closeCameraZoom()" class="text-slate-400 hover:text-white text-lg leading-none px-2 py-1">✕</button>
+      </div>
+      <div class="bg-black aspect-video flex items-center justify-center">
+        <img id="camera-zoom-img" alt="Zoomed Camera" class="w-full h-full object-contain" />
+      </div>
     </div>
   </div>
 

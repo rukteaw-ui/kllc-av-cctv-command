@@ -297,6 +297,23 @@ async def proxy_snapshot(url: str, request: Request):
 
     return Response(content=image_bytes, media_type="image/jpeg")
 
+@router.get("/cameras/{channel_id}/snapshot")
+async def get_camera_live_snapshot(channel_id: int, request: Request):
+    """Stream live JPEG frame from Hikvision NVR camera channel (read-only, no disk storage)."""
+    isapi_client = getattr(request.app.state, "isapi_client", None)
+    if not isapi_client:
+        raise HTTPException(status_code=500, detail="ISAPI client unavailable")
+
+    image_bytes = await isapi_client.get_camera_live_picture(channel_id)
+    if not image_bytes:
+        raise HTTPException(status_code=503, detail=f"Camera D{channel_id} stream unavailable")
+
+    return Response(
+        content=image_bytes,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+    )
+
 @router.post("/test/simulate-event")
 async def simulate_event(
     request: Request,

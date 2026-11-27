@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadDailyStats();
   loadAccessEvents(0);
   loadPersonnel();
+  initCameraLiveViews();
 
   // Load sound preference from localStorage
   const savedSound = localStorage.getItem('kllc_sound_enabled');
@@ -778,6 +779,7 @@ async function saveNvrSettings(event) {
       statusBox.textContent = '✅ ' + data.message;
       showToast(data.message, 'success');
       updateNvrStatusBadge(true, 'NVR เชื่อมต่อปกติ');
+      refreshAllCameras();
     } else {
       statusBox.className = 'rounded-xl p-3 text-xs border bg-amber-950/70 border-amber-700 text-amber-300';
       statusBox.textContent = '⚠️ ' + (data.message || 'บันทึกค่าแล้ว แต่ยังเชื่อมต่อ NVR ไม่ได้');
@@ -792,4 +794,88 @@ async function saveNvrSettings(event) {
     btn.textContent = 'บันทึก & เชื่อมต่อ NVR';
   }
 }
+
+// --- LIVE CAMERA SNAPSHOT VIEWER (D1, D2, D3, D9) ---
+const CAMERA_IDS = [1, 2, 3, 9];
+const cameraBlobUrls = {};
+let zoomedCameraId = null;
+let zoomTimer = null;
+
+function initCameraLiveViews() {
+  refreshAllCameras();
+  setInterval(() => {
+    if (state.currentTab === 'live' && !state.isPaused) {
+      refreshAllCameras();
+    }
+  }, 2000);
+}
+
+function refreshAllCameras() {
+  CAMERA_IDS.forEach(chId => refreshSingleCamera(chId));
+}
+
+async function refreshSingleCamera(chId) {
+  const imgEl = document.getElementById(`cam-img-${chId}`);
+  const phEl = document.getElementById(`cam-placeholder-${chId}`);
+  const badgeEl = document.getElementById(`cam-live-badge-${chId}`);
+  if (!imgEl) return;
+
+  try {
+    const res = await fetch(`/api/cameras/${chId}/snapshot?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const newUrl = URL.createObjectURL(blob);
+
+    // Revoke previous blob URL to prevent memory leak
+    if (cameraBlobUrls[chId]) {
+      URL.revokeObjectURL(cameraBlobUrls[chId]);
+    }
+    cameraBlobUrls[chId] = newUrl;
+
+    imgEl.src = newUrl;
+    imgEl.classList.remove('hidden');
+    if (phEl) phEl.classList.add('hidden');
+    if (badgeEl) badgeEl.classList.remove('hidden');
+
+    if (zoomedCameraId === chId) {
+      const zoomImg = document.getElementById('camera-zoom-img');
+      if (zoomImg) zoomImg.src = newUrl;
+    }
+  } catch (e) {
+    // Keep placeholder quietly when offline
+  }
+}
+
+function openCameraZoom(chId, title) {
+  const modal = document.getElementById('camera-zoom-modal');
+  const titleEl = document.getElementById('camera-zoom-title');
+  const zoomImg = document.getElementById('camera-zoom-img');
+
+  zoomedCameraId = chId;
+  if (titleEl) titleEl.textContent = title;
+  if (zoomImg && cameraBlobUrls[chId]) {
+    zoomImg.src = cameraBlobUrls[chId];
+  }
+  refreshSingleCamera(chId);
+
+  if (zoomTimer) clearInterval(zoomTimer);
+  zoomTimer = setInterval(() => {
+    if (zoomedCameraId) refreshSingleCamera(zoomedCameraId);
+  }, 1000);
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+function closeCameraZoom() {
+  const modal = document.getElementById('camera-zoom-modal');
+  zoomedCameraId = null;
+  if (zoomTimer) {
+    clearInterval(zoomTimer);
+    zoomTimer = null;
+  }
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
 

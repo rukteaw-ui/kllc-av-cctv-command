@@ -247,6 +247,24 @@ class HikvisionISAPIClient:
             logger.error(f"Error fetching snapshot: {e}")
         return None
 
+    async def get_camera_live_picture(self, channel_id: int) -> Optional[bytes]:
+        """Fetch live JPEG snapshot for a camera channel (D1->102/101, D2->202/201, etc.) without saving to disk."""
+        # Prefer sub-stream (*02) for fast refresh, fallback to main stream (*01)
+        candidate_streams = [channel_id * 100 + 2, channel_id * 100 + 1]
+        try:
+            async with await self._get_client(timeout=4.0) as client:
+                for stream_id in candidate_streams:
+                    path = f"/ISAPI/Streaming/channels/{stream_id}/picture"
+                    if not self.is_safe_url(path):
+                        continue
+                    url = f"{self.base_url}{path}"
+                    resp = await client.get(url)
+                    if resp.status_code == 200 and resp.content and resp.content.startswith(b"\xff\xd8"):
+                        return resp.content
+        except Exception as e:
+            logger.debug(f"Live picture unavailable for D{channel_id}: {e}")
+        return None
+
     async def start_alert_stream(
         self,
         event_callback: Callable[[Dict[str, Any]], Any],

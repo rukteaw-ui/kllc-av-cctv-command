@@ -68,5 +68,6 @@ SAFE_ENDPOINTS = {
     "fd_lib": "/ISAPI/Intelligent/FDLib",
     "fd_search": "/ISAPI/Intelligent/FDLib/FDSearch",
     "alert_stream": "/ISAPI/Event/notification/alertStream",
-    "snapshot_track": "/picture/Streaming/tracks/"
+    "snapshot_track": "/picture/Streaming/tracks/",
+    "live_picture": "/ISAPI/Streaming/channels/"
 }
