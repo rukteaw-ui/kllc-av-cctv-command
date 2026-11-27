@@ -1,11 +1,17 @@
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Base directory of the project
-BASE_DIR = Path(__file__).resolve().parent.parent
+# Resolve directories for both normal Python and PyInstaller single-file .exe
+if getattr(sys, "frozen", False):
+    BUNDLE_DIR = Path(sys._MEIPASS)
+    BASE_DIR = Path(sys.executable).resolve().parent
+else:
+    BUNDLE_DIR = Path(__file__).resolve().parent.parent
+    BASE_DIR = BUNDLE_DIR
 
-# Load .env file
+# Load .env file from alongside the executable / project folder
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 # NVR Connection Settings

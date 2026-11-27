@@ -1,0 +1,91 @@
+name: Build KLLC Smart Access Windows EXE
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'kllc-smart-access/**'
+      - '.github/workflows/build-windows-exe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: kllc-smart-access
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies & PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build single-file KLLC_Smart_Access.exe
+        run: |
+          pyinstaller --noconfirm --onefile --console ^
+            --name KLLC_Smart_Access ^
+            --add-data "static;static" ^
+            --hidden-import uvicorn.logging ^
+            --hidden-import uvicorn.loops ^
+            --hidden-import uvicorn.loops.auto ^
+            --hidden-import uvicorn.protocols ^
+            --hidden-import uvicorn.protocols.http ^
+            --hidden-import uvicorn.protocols.http.auto ^
+            --hidden-import uvicorn.protocols.websockets ^
+            --hidden-import uvicorn.protocols.websockets.auto ^
+            --hidden-import uvicorn.lifespan ^
+            --hidden-import uvicorn.lifespan.on ^
+            --hidden-import websockets ^
+            --hidden-import websockets.legacy ^
+            --hidden-import websockets.legacy.server ^
+            --hidden-import aiosqlite ^
+            run_desktop.py
+        shell: cmd
+
+      - name: Smoke-test KLLC_Smart_Access.exe on Windows
+        shell: pwsh
+        run: |
+          $env:KLLC_NO_BROWSER = "1"
+          $proc = Start-Process -FilePath ".\dist\KLLC_Smart_Access.exe" -PassThru -NoNewWindow
+          $ok = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            Start-Sleep -Seconds 1
+            try {
+              $r1 = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -UseBasicParsing -TimeoutSec 2
+              $r2 = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/status" -UseBasicParsing -TimeoutSec 2
+              if ($r1.StatusCode -eq 200 -and $r2.StatusCode -eq 200 -and $r1.Content -match "cam-img-2") {
+                Write-Host "SMOKE TEST PASSED! HTTP 200 on / and /api/status"
+                $ok = $true
+                break
+              }
+            } catch {}
+          }
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) {
+            Write-Error "KLLC_Smart_Access.exe failed Windows smoke test!"
+            exit 1
+          }
+
+      - name: Publish KLLC_Smart_Access.exe to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = "kllc-smart-access-latest"
+          gh release delete $tag --yes 2>$null
+          gh release create $tag .\dist\KLLC_Smart_Access.exe `
+            --title "KLLC Smart Access Lite (Windows Standalone EXE)" `
+            --notes "Double-click KLLC_Smart_Access.exe to run immediately. No Python, no ZIP extraction, no installation required." `
+            --latest

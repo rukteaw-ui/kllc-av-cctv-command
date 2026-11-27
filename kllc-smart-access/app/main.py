@@ -109,14 +109,14 @@ app.include_router(api_router)
 app.include_router(ws_router)
 
 # Mount Static Files
-static_dir = BASE_DIR / "static"
+static_dir = BUNDLE_DIR / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 @app.get("/")
 async def serve_index():
     """Serve main Single Page Application dashboard."""
-    index_file = BASE_DIR / "static" / "index.html"
+    index_file = BUNDLE_DIR / "static" / "index.html"
     if index_file.exists():
         return FileResponse(str(index_file))
     return {"message": "KLLC Smart Access Lite API is running. UI not found in static/."}
