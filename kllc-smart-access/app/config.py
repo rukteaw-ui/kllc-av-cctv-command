@@ -14,11 +14,11 @@ else:
 # Load .env file from alongside the executable / project folder
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 
-# NVR Connection Settings
+# NVR Connection Settings (Never auto-login with placeholder password!)
 NVR_IP = os.getenv("NVR_IP", "10.37.2.97")
 NVR_PORT = int(os.getenv("NVR_PORT", "80"))
-NVR_USER = os.getenv("NVR_USER", "admin")
-NVR_PASS = os.getenv("NVR_PASS", "Admin12345!")
+NVR_USER = os.getenv("NVR_USER", "")
+NVR_PASS = os.getenv("NVR_PASS", "")
 NVR_BASE_URL = f"http://{NVR_IP}:{NVR_PORT}"
 
 # Application Settings

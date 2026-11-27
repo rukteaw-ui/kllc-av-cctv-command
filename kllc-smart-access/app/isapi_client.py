@@ -27,6 +27,11 @@ class HikvisionISAPIClient:
         self._stop_event = asyncio.Event()
         self._use_basic_auth = False
         self._stream_id_cache: Dict[int, int] = {}
+        self._auth_failed = False
+
+    def has_credentials(self) -> bool:
+        """Return True only when IP, username, and password are all explicitly configured."""
+        return bool(self.nvr_ip and self.nvr_user and self.nvr_pass)
 
     def _make_auth(self, force_basic: bool = False):
         """Create a fresh auth instance per client (httpx.DigestAuth is NOT concurrency-safe when shared)."""
@@ -44,6 +49,7 @@ class HikvisionISAPIClient:
         self.base_url = f"http://{self.nvr_ip}:{self.nvr_port}".rstrip("/")
         self.is_connected = False
         self._use_basic_auth = False
+        self._auth_failed = False
         self._stream_id_cache.clear()
 
     async def _get_client(self, timeout: float = 10.0, force_basic: bool = False) -> httpx.AsyncClient:
@@ -61,7 +67,11 @@ class HikvisionISAPIClient:
         return False
 
     async def get_device_info(self) -> Dict[str, Any]:
-        """Fetch NVR device info (GET /ISAPI/System/deviceInfo) with Digest -> Basic auth fallback."""
+        """Fetch NVR device info (GET /ISAPI/System/deviceInfo) with anti-lockout circuit breaker."""
+        if not self.has_credentials():
+            self.is_connected = False
+            return {"status": "unconfigured", "error": "ยังไม่ได้ตั้งค่าชื่อผู้ใช้และรหัสผ่าน NVR"}
+
         endpoint = SAFE_ENDPOINTS["device_info"]
         url = f"{self.base_url}{endpoint}"
 
@@ -83,6 +93,7 @@ class HikvisionISAPIClient:
                         info[tag] = child.text
                     self.device_info = info
                     self.is_connected = True
+                    self._auth_failed = False
                     return {
                         "status": "online",
                         "deviceName": info.get("deviceName", "Hikvision NVR"),
@@ -92,6 +103,8 @@ class HikvisionISAPIClient:
                     }
                 else:
                     self.is_connected = False
+                    if resp.status_code in (401, 403):
+                        self._auth_failed = True
                     return {"status": "error", "code": resp.status_code, "detail": resp.text[:200]}
         except Exception as e:
             self.is_connected = False
@@ -261,7 +274,10 @@ class HikvisionISAPIClient:
         return None
 
     async def get_camera_live_picture(self, channel_id: int) -> Optional[bytes]:
-        """Fetch live JPEG snapshot for a camera channel (D1->102/101/1, D2->202/201/2, etc.) without saving to disk."""
+        """Fetch live JPEG snapshot for a camera channel without saving to disk. Never polls if unauthenticated."""
+        if not self.is_connected or self._auth_failed or not self.has_credentials():
+            return None
+
         cached = self._stream_id_cache.get(channel_id)
         candidate_streams = [cached] if cached else [channel_id * 100 + 2, channel_id * 100 + 1, channel_id]
         try:
@@ -272,6 +288,10 @@ class HikvisionISAPIClient:
                         continue
                     url = f"{self.base_url}{path}"
                     resp = await client.get(url)
+                    if resp.status_code in (401, 403):
+                        self._auth_failed = True
+                        self.is_connected = False
+                        return None
                     if resp.status_code == 200 and resp.content and resp.content.startswith(b"\xff\xd8"):
                         self._stream_id_cache[channel_id] = stream_id
                         return resp.content
@@ -288,6 +308,7 @@ class HikvisionISAPIClient:
             "nvr_url": self.base_url,
             "nvr_user": self.nvr_user,
             "auth_mode": "Basic" if self._use_basic_auth else "Digest",
+            "auth_locked_protection": self._auth_failed,
             "device_info": await self.get_device_info(),
             "camera_d2_picture": False,
             "face_libraries": []
@@ -306,16 +327,24 @@ class HikvisionISAPIClient:
     ):
         """
         Long-lived HTTP Alert Stream listener (/ISAPI/Event/notification/alertStream)
-        with automatic reconnection and exponential backoff.
+        with automatic reconnection on network drops AND strict anti-lockout stop on HTTP 401/403.
         """
         self._stop_event.clear()
         endpoint = SAFE_ENDPOINTS["alert_stream"]
-        url = f"{self.base_url}{endpoint}"
+
+        if not self.has_credentials():
+            self.is_connected = False
+            await status_callback({
+                "connected": False,
+                "status": "unconfigured",
+                "message": "รอตั้งค่า NVR (กดปุ่ม ⚙️ ตั้งค่า NVR เพื่อใส่ชื่อผู้ใช้และรหัสผ่าน)"
+            })
+            return
 
         backoff_seconds = 2
         max_backoff = 30
 
-        logger.info(f"Starting ISAPI alert stream listener at {url}")
+        logger.info(f"Starting ISAPI alert stream listener at {self.base_url}{endpoint}")
 
         while not self._stop_event.is_set():
             url = f"{self.base_url}{endpoint}"
@@ -324,12 +353,32 @@ class HikvisionISAPIClient:
                 
                 # Check device online first
                 dev_info = await self.get_device_info()
+                if dev_info.get("code") in (401, 403):
+                    self._auth_failed = True
+                    self.is_connected = False
+                    logger.error("NVR authentication failed (HTTP 401/403). Stopping auto-retry to prevent NVR Illegal Login Lock.")
+                    await status_callback({
+                        "connected": False,
+                        "status": "auth_error",
+                        "message": "หยุดเชื่อมต่ออัตโนมัติ (รหัสผ่าน NVR ไม่ถูกต้อง — ป้องกันเครื่องล็อก)"
+                    })
+                    return
+
                 if dev_info.get("status") != "online":
-                    err_detail = f"HTTP {dev_info.get('code')}" if dev_info.get("code") else dev_info.get("error", "Auth/Network Error")
+                    err_detail = f"HTTP {dev_info.get('code')}" if dev_info.get("code") else dev_info.get("error", "Network Error")
                     raise ConnectionError(f"NVR offline or unreachable: {err_detail}")
 
                 async with httpx.AsyncClient(auth=self._make_auth(), timeout=None, verify=False) as client:
                     async with client.stream("GET", url) as stream_resp:
+                        if stream_resp.status_code in (401, 403):
+                            self._auth_failed = True
+                            self.is_connected = False
+                            await status_callback({
+                                "connected": False,
+                                "status": "auth_error",
+                                "message": "หยุดเชื่อมต่ออัตโนมัติ (สิทธิ์ ISAPI ไม่ผ่าน HTTP 401 — ป้องกันเครื่องล็อก)"
+                            })
+                            return
                         if stream_resp.status_code != 200:
                             raise ConnectionError(f"alertStream returned HTTP {stream_resp.status_code}")
 
