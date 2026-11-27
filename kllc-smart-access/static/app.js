@@ -720,3 +720,76 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 300);
   }, 3500);
 }
+
+// --- NVR SETTINGS MODAL ---
+async function openSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  const statusBox = document.getElementById('settings-status-box');
+  if (statusBox) statusBox.classList.add('hidden');
+
+  try {
+    const res = await fetch('/api/settings');
+    const data = await res.json();
+    document.getElementById('set-nvr-ip').value = data.nvr_ip || '192.168.1.100';
+    document.getElementById('set-nvr-port').value = data.nvr_port || 80;
+    document.getElementById('set-nvr-user').value = data.nvr_user || 'admin';
+    document.getElementById('set-nvr-pass').value = '';
+  } catch (e) {
+    console.error("Failed to load settings:", e);
+  }
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+function closeSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
+async function saveNvrSettings(event) {
+  event.preventDefault();
+  const btn = document.getElementById('btn-save-settings');
+  const statusBox = document.getElementById('settings-status-box');
+
+  const payload = {
+    nvr_ip: document.getElementById('set-nvr-ip').value.trim(),
+    nvr_port: parseInt(document.getElementById('set-nvr-port').value, 10) || 80,
+    nvr_user: document.getElementById('set-nvr-user').value.trim(),
+    nvr_pass: document.getElementById('set-nvr-pass').value
+  };
+
+  btn.disabled = true;
+  btn.textContent = 'กำลังบันทึกและทดสอบ...';
+  statusBox.classList.add('hidden');
+
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    statusBox.classList.remove('hidden');
+    if (data.connected) {
+      statusBox.className = 'rounded-xl p-3 text-xs border bg-emerald-950/70 border-emerald-700 text-emerald-300';
+      statusBox.textContent = '✅ ' + data.message;
+      showToast(data.message, 'success');
+      updateNvrStatusBadge(true, 'NVR เชื่อมต่อปกติ');
+    } else {
+      statusBox.className = 'rounded-xl p-3 text-xs border bg-amber-950/70 border-amber-700 text-amber-300';
+      statusBox.textContent = '⚠️ ' + (data.message || 'บันทึกค่าแล้ว แต่ยังเชื่อมต่อ NVR ไม่ได้');
+      showToast('บันทึกการตั้งค่าแล้ว', 'info');
+    }
+  } catch (e) {
+    statusBox.classList.remove('hidden');
+    statusBox.className = 'rounded-xl p-3 text-xs border bg-rose-950/70 border-rose-700 text-rose-300';
+    statusBox.textContent = '❌ เกิดข้อผิดพลาดในการบันทึกการตั้งค่า';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'บันทึก & เชื่อมต่อ NVR';
+  }
+}
+

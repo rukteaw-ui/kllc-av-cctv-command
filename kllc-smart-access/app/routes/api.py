@@ -2,6 +2,7 @@ import io
 import csv
 from datetime import datetime
 from typing import Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Query, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 import openpyxl
@@ -13,9 +14,15 @@ from app.database import (
     upsert_person, get_cameras, insert_access_event,
     get_current_time_str
 )
-from app.config import CAMERA_CHANNELS, SIMULATION_MODE
+from app.config import CAMERA_CHANNELS, SIMULATION_MODE, BASE_DIR
 
 router = APIRouter(prefix="/api", tags=["API"])
+
+class NVRSettingsPayload(BaseModel):
+    nvr_ip: str
+    nvr_port: int = 80
+    nvr_user: str = "admin"
+    nvr_pass: Optional[str] = None
 
 @router.get("/status")
 async def get_system_status(request: Request):
@@ -348,3 +355,72 @@ async def simulate_event(
         })
 
     return {"success": True, "event": event}
+
+@router.get("/settings")
+async def get_nvr_settings(request: Request):
+    """Return current NVR connection settings (excluding raw password)."""
+    isapi_client = getattr(request.app.state, "isapi_client", None)
+    if not isapi_client:
+        raise HTTPException(status_code=500, detail="ISAPI client unavailable")
+    return {
+        "nvr_ip": isapi_client.nvr_ip,
+        "nvr_port": isapi_client.nvr_port,
+        "nvr_user": isapi_client.nvr_user,
+        "has_password": bool(isapi_client.nvr_pass),
+        "connected": isapi_client.is_connected,
+        "device_info": isapi_client.device_info
+    }
+
+@router.post("/settings")
+async def update_nvr_settings(payload: NVRSettingsPayload, request: Request):
+    """Save NVR settings to .env, test connection, and reconnect alertStream."""
+    isapi_client = getattr(request.app.state, "isapi_client", None)
+    if not isapi_client:
+        raise HTTPException(status_code=500, detail="ISAPI client unavailable")
+
+    # Update in-memory credentials
+    isapi_client.update_credentials(
+        ip=payload.nvr_ip,
+        port=payload.nvr_port,
+        user=payload.nvr_user,
+        password=payload.nvr_pass
+    )
+
+    # Persist to .env file so Windows restarts remember the settings
+    env_path = BASE_DIR / ".env"
+    env_content = (
+        "# KLLC Smart Access Lite - Saved via Web Settings\n"
+        f"NVR_IP={isapi_client.nvr_ip}\n"
+        f"NVR_PORT={isapi_client.nvr_port}\n"
+        f"NVR_USER={isapi_client.nvr_user}\n"
+        f"NVR_PASS={isapi_client.nvr_pass}\n"
+        "HOST=0.0.0.0\n"
+        "PORT=8000\n"
+        "DEBUG=False\n"
+        "DB_PATH=kllc_access.db\n"
+    )
+    try:
+        env_path.write_text(env_content, encoding="utf-8")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ไม่สามารถบันทึกไฟล์ .env ได้: {e}")
+
+    # Test connection immediately
+    dev_info = await isapi_client.get_device_info()
+
+    # Restart background stream listener with new credentials
+    restart_fn = getattr(request.app.state, "restart_stream", None)
+    if restart_fn:
+        await restart_fn()
+
+    is_online = dev_info.get("status") == "online"
+    return {
+        "success": True,
+        "connected": is_online,
+        "device_info": dev_info,
+        "message": (
+            f"บันทึกและเชื่อมต่อ NVR ({dev_info.get('model', 'Hikvision')}) สำเร็จ!"
+            if is_online
+            else "บันทึกค่าเรียบร้อยแล้ว แต่ยังไม่พบเครื่อง NVR ในวงแลนนี้ (ระบบจะเชื่อมต่ออัตโนมัติเมื่อต่อสายแลน)"
+        )
+    }
+

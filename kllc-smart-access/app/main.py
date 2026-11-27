@@ -54,11 +54,25 @@ async def lifespan(app: FastAPI):
             "data": status
         })
 
+    async def restart_stream():
+        """Stop current alertStream task and start a new one with updated credentials."""
+        isapi_client.stop_alert_stream()
+        old_task = isapi_client.running_stream_task
+        if old_task and not old_task.done():
+            old_task.cancel()
+            try:
+                await old_task
+            except asyncio.CancelledError:
+                pass
+        new_task = asyncio.create_task(
+            isapi_client.start_alert_stream(on_stream_event, on_status_change)
+        )
+        isapi_client.running_stream_task = new_task
+
+    app.state.restart_stream = restart_stream
+
     # Launch background alert stream listener
-    stream_task = asyncio.create_task(
-        isapi_client.start_alert_stream(on_stream_event, on_status_change)
-    )
-    isapi_client.running_stream_task = stream_task
+    await restart_stream()
 
     logger.info("KLLC Smart Access Lite initialized successfully.")
     yield
@@ -66,10 +80,11 @@ async def lifespan(app: FastAPI):
     # --- Shutdown ---
     logger.info("Shutting down KLLC Smart Access Lite...")
     isapi_client.stop_alert_stream()
-    if not stream_task.done():
-        stream_task.cancel()
+    task = isapi_client.running_stream_task
+    if task and not task.done():
+        task.cancel()
         try:
-            await stream_task
+            await task
         except asyncio.CancelledError:
             pass
 

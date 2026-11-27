@@ -117,16 +117,22 @@
         </button>
       </nav>
 
-      <!-- Right: NVR Status Badge & Clock -->
-      <div class="hidden md:flex items-center space-x-4">
+      <!-- Right: NVR Status Badge, Settings & Clock -->
+      <div class="flex items-center space-x-3">
         <!-- NVR Connection Pill -->
-        <div id="nvr-status-badge" class="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-xs">
+        <div id="nvr-status-badge" class="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-xs">
           <span id="nvr-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
           <span id="nvr-status-text" class="font-medium text-slate-300">กำลังเชื่อมต่อ NVR...</span>
         </div>
 
+        <!-- Settings Button -->
+        <button onclick="openSettingsModal()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 flex items-center space-x-1.5 transition" title="ตั้งค่า IP และรหัสผ่านเครื่อง NVR">
+          <span>⚙️</span>
+          <span>ตั้งค่า NVR</span>
+        </button>
+
         <!-- Clock -->
-        <div class="text-right">
+        <div class="hidden md:block text-right">
           <div id="live-clock" class="font-mono text-sm font-bold text-cyan-400">--:--:--</div>
           <div id="live-date" class="text-[10px] text-slate-400">--/--/----</div>
         </div>
@@ -493,6 +499,51 @@
   <footer class="bg-[#0a0f17] border-t border-slate-800/80 px-4 py-3 text-center text-xs text-slate-500">
     <span>KLLC Smart Access Lite • iDS-7716NXI-M4/X ISAPI Face Recognition Engine • สำนักการเรียนรู้ตลอดชีวิต สจล.</span>
   </footer>
+
+  <!-- NVR Settings Modal -->
+  <div id="settings-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="bg-[#0f1726] border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="font-display font-bold text-base text-white">⚙️ ตั้งค่าการเชื่อมต่อเครื่อง NVR</h3>
+          <p class="text-xs text-slate-400 mt-0.5">กรอก IP และรหัสผ่านของ Hikvision NVR (ไม่ต้องแก้ไฟล์โค้ด)</p>
+        </div>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white text-lg leading-none px-2 py-1">✕</button>
+      </div>
+
+      <form id="settings-form" onsubmit="saveNvrSettings(event)" class="space-y-4 text-xs">
+        <div class="grid grid-cols-3 gap-3">
+          <div class="col-span-2 space-y-1">
+            <label class="font-medium text-slate-300">IP เครื่อง NVR</label>
+            <input type="text" id="set-nvr-ip" required placeholder="เช่น 192.168.1.100" class="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 font-mono focus:border-cyan-500 focus:outline-none" />
+          </div>
+          <div class="space-y-1">
+            <label class="font-medium text-slate-300">Port</label>
+            <input type="number" id="set-nvr-port" required value="80" class="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 font-mono focus:border-cyan-500 focus:outline-none" />
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <label class="font-medium text-slate-300">ชื่อผู้ใช้ (Username)</label>
+          <input type="text" id="set-nvr-user" required value="admin" class="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 focus:border-cyan-500 focus:outline-none" />
+        </div>
+
+        <div class="space-y-1">
+          <label class="font-medium text-slate-300">รหัสผ่าน (Password)</label>
+          <input type="password" id="set-nvr-pass" placeholder="เว้นว่างไว้หากใช้รหัสผ่านเดิม" class="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 focus:border-cyan-500 focus:outline-none" />
+        </div>
+
+        <div id="settings-status-box" class="hidden rounded-xl p-3 text-xs border"></div>
+
+        <div class="flex items-center justify-end space-x-2 pt-2">
+          <button type="button" onclick="closeSettingsModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition">ยกเลิก</button>
+          <button type="submit" id="btn-save-settings" class="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-semibold shadow-lg transition">
+            บันทึก &amp; เชื่อมต่อ NVR
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- Notification Toast Container -->
   <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>

@@ -5,7 +5,7 @@ from typing import Dict, Any, List, Optional, Callable, AsyncGenerator
 import httpx
 
 from app.config import (
-    NVR_BASE_URL, NVR_USER, NVR_PASS, TARGET_LIBRARIES,
+    NVR_IP, NVR_PORT, NVR_BASE_URL, NVR_USER, NVR_PASS, TARGET_LIBRARIES,
     SAFE_ENDPOINTS, SIMULATION_MODE
 )
 from app.parser import parse_alert_payload, clean_tag, parse_xml_tree
@@ -14,12 +14,27 @@ logger = logging.getLogger("isapi_client")
 
 class HikvisionISAPIClient:
     def __init__(self):
+        self.nvr_ip = NVR_IP
+        self.nvr_port = NVR_PORT
+        self.nvr_user = NVR_USER
+        self.nvr_pass = NVR_PASS
         self.base_url = NVR_BASE_URL.rstrip("/")
-        self.auth = httpx.DigestAuth(NVR_USER, NVR_PASS)
+        self.auth = httpx.DigestAuth(self.nvr_user, self.nvr_pass)
         self.is_connected = False
         self.device_info = {}
         self.running_stream_task: Optional[asyncio.Task] = None
         self._stop_event = asyncio.Event()
+
+    def update_credentials(self, ip: str, port: int, user: str, password: Optional[str] = None):
+        """Update NVR connection credentials at runtime without restarting the server."""
+        self.nvr_ip = ip.strip()
+        self.nvr_port = int(port)
+        self.nvr_user = user.strip()
+        if password is not None and password != "":
+            self.nvr_pass = password
+        self.base_url = f"http://{self.nvr_ip}:{self.nvr_port}".rstrip("/")
+        self.auth = httpx.DigestAuth(self.nvr_user, self.nvr_pass)
+        self.is_connected = False
 
     async def _get_client(self, timeout: float = 10.0) -> httpx.AsyncClient:
         return httpx.AsyncClient(
