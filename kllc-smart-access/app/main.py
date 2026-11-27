@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import HOST, PORT, DEBUG, BASE_DIR
+from app.config import HOST, PORT, DEBUG, BASE_DIR, BUNDLE_DIR
 from app.database import init_db, insert_access_event
 from app.isapi_client import HikvisionISAPIClient
 from app.routes.api import router as api_router
