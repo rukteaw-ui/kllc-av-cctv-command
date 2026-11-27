@@ -35,8 +35,8 @@ async def lifespan(app: FastAPI):
     async def on_stream_event(event: dict):
         """Callback when an event arrives from ISAPI alertStream."""
         logger.info(f"Received alert event: {event.get('event_type')} on {event.get('camera_name')}")
-        # Insert to database
-        if event.get("event_type") in ["faceMatch", "facesnapMatch", "FaceSnapMatch", "faceSnap", "facesnap"]:
+        # Insert to database for all face recognition / detection events
+        if "match_status" in event:
             event_id = await insert_access_event(event)
             event["id"] = event_id
 

@@ -413,14 +413,19 @@ async def update_nvr_settings(payload: NVRSettingsPayload, request: Request):
         await restart_fn()
 
     is_online = dev_info.get("status") == "online"
+    if is_online:
+        msg = f"บันทึกและเชื่อมต่อ NVR ({dev_info.get('model', 'Hikvision')}) สำเร็จ!"
+    elif dev_info.get("code") == 401:
+        msg = "บันทึกค่าแล้ว แต่ชื่อผู้ใช้หรือรหัสผ่าน NVR ไม่ถูกต้อง (HTTP 401)"
+    elif dev_info.get("code"):
+        msg = f"บันทึกค่าแล้ว แต่ NVR ตอบกลับ HTTP {dev_info.get('code')}"
+    else:
+        msg = f"บันทึกค่าเรียบร้อยแล้ว แต่ยังไม่พบเครื่อง NVR ที่ {isapi_client.nvr_ip}:{isapi_client.nvr_port} ในวงแลนนี้"
+
     return {
         "success": True,
         "connected": is_online,
         "device_info": dev_info,
-        "message": (
-            f"บันทึกและเชื่อมต่อ NVR ({dev_info.get('model', 'Hikvision')}) สำเร็จ!"
-            if is_online
-            else "บันทึกค่าเรียบร้อยแล้ว แต่ยังไม่พบเครื่อง NVR ในวงแลนนี้ (ระบบจะเชื่อมต่ออัตโนมัติเมื่อต่อสายแลน)"
-        )
+        "message": msg
     }
 
